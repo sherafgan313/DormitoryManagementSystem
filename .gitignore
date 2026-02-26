@@ -1,0 +1,12 @@
+# Node modules
+node_modules/
+
+# Angular build
+dist/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
