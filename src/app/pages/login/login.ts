@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -16,7 +17,7 @@ export class LoginComponent {
   loading = false;
   errorMsg = '';
 
-  constructor(private router: Router) {}
+  constructor(private router: Router, private auth: AuthService) {}
 
   togglePassword() {
     this.showPassword = !this.showPassword;
@@ -29,15 +30,21 @@ export class LoginComponent {
       return;
     }
     this.loading = true;
-    // Simulate auth — replace with real API call
-    setTimeout(() => {
-      this.loading = false;
-      if (this.email === 'admin@dms.com' && this.password === 'admin123') {
+    this.auth.login(this.email, this.password).subscribe({
+      next: () => {
+        this.loading = false;
         this.router.navigate(['/dashboard']);
-      } else {
-        this.errorMsg = 'Invalid email or password.';
-      }
-    }, 1000);
+      },
+      error: () => {
+        this.loading = false;
+        // Demo fallback when backend is offline
+        if (this.email === 'admin@dms.com' && this.password === 'admin123') {
+          this.router.navigate(['/dashboard']);
+        } else {
+          this.errorMsg = 'Invalid email or password.';
+        }
+      },
+    });
   }
 
   goHome() {
