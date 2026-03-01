@@ -2,10 +2,12 @@ import { Routes } from '@angular/router';
 import { HomeComponent } from './pages/home/home';
 import { LoginComponent } from './pages/login/login';
 import { DashboardComponent } from './pages/dashboard/dashboard';
+import { StudentDashboardComponent } from './pages/student-dashboard/student-dashboard';
 
 export const routes: Routes = [
-  { path: '',          component: HomeComponent },
-  { path: 'login',     component: LoginComponent },
-  { path: 'dashboard', component: DashboardComponent },
-  { path: '**',        redirectTo: '' },
+  { path: '',                 component: HomeComponent },
+  { path: 'login',            component: LoginComponent },
+  { path: 'dashboard',        component: DashboardComponent },
+  { path: 'student-dashboard',component: StudentDashboardComponent },
+  { path: '**',               redirectTo: '' },
 ];

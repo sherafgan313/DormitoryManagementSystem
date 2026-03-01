@@ -1,0 +1,741 @@
+<div class="layout" [class.layout--collapsed]="!sidebarOpen">
+
+  <!-- ═══ SIDEBAR ════════════════════════════════════════════════════ -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <span class="sidebar__brand-icon">🏢</span>
+      @if (sidebarOpen) {
+        <span class="sidebar__brand-name">DormMS</span>
+      }
+    </div>
+
+    <nav class="sidebar__nav">
+      @for (item of navItems; track item.id) {
+        <button
+          class="sidebar__nav-item"
+          [class.sidebar__nav-item--active]="activeNav === item.id"
+          (click)="setActive(item.id)"
+        >
+          <span class="sidebar__nav-icon">{{ item.icon }}</span>
+          @if (sidebarOpen) {
+            <span class="sidebar__nav-label">{{ item.label }}</span>
+          }
+        </button>
+      }
+    </nav>
+
+    <button class="sidebar__logout" (click)="logout()">
+      <span>🚪</span>
+      @if (sidebarOpen) { <span>Logout</span> }
+    </button>
+  </aside>
+
+  <!-- ═══ MAIN ════════════════════════════════════════════════════════ -->
+  <div class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar__left">
+        <button class="topbar__toggle" (click)="toggleSidebar()">
+          {{ sidebarOpen ? '◀' : '▶' }}
+        </button>
+        <span class="topbar__page">{{ pageName }}</span>
+      </div>
+      <div class="topbar__right">
+        <button class="topbar__icon-btn" title="Notifications">🔔</button>
+        <div class="topbar__avatar"><span>{{ student.initials }}</span></div>
+        <div class="topbar__user">
+          <span class="topbar__user-name">{{ student.name }}</span>
+          <span class="topbar__user-role">Student</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ═══ CONTENT ══════════════════════════════════════════════════ -->
+    <div class="content">
+
+      <!-- ─── OVERVIEW ──────────────────────────────────────────────── -->
+      @if (activeNav === 'overview') {
+        <div class="content__welcome">
+          <div>
+            <h1 class="content__title">Good morning, {{ student.name.split(' ')[0] }} 👋</h1>
+            <p class="content__subtitle">Here's an overview of your dormitory status.</p>
+          </div>
+          <span class="content__date">March 1, 2026</span>
+        </div>
+
+        <!-- Stat cards -->
+        <div class="stats-grid stats-grid--4">
+          @for (stat of stats; track stat.label) {
+            <div class="stat-card stat-card--{{ stat.color }}">
+              <div class="stat-card__top">
+                <span class="stat-card__icon">{{ stat.icon }}</span>
+                <span class="stat-card__label">{{ stat.label }}</span>
+              </div>
+              <div class="stat-card__value">{{ stat.value }}</div>
+              <div class="stat-card__change"
+                   [class.stat-card__change--positive]="stat.positive"
+                   [class.stat-card__change--negative]="!stat.positive">
+                {{ stat.positive ? '▲' : '▼' }} {{ stat.change }}
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Payment due banner -->
+        <div class="due-banner">
+          <div class="due-banner__left">
+            <span class="due-banner__icon">⏰</span>
+            <div>
+              <strong>Rent due in {{ nextPayment.daysLeft }} days</strong>
+              <p>₱{{ nextPayment.amount | number }} for {{ nextPayment.month }} — due {{ nextPayment.dueDate }}</p>
+            </div>
+          </div>
+          <button class="btn-primary" (click)="navigateTo('payments')">Pay Now</button>
+        </div>
+
+        <div class="bottom-row">
+          <!-- Recent activity -->
+          <div class="card activity-card">
+            <div class="card__header">
+              <h2 class="card__title">Recent Activity</h2>
+            </div>
+            <ul class="activity-list">
+              @for (item of recentActivity; track item.message) {
+                <li class="activity-item">
+                  <span class="activity-item__icon">{{ item.icon }}</span>
+                  <div class="activity-item__info">
+                    <p class="activity-item__msg">{{ item.message }}</p>
+                    <span class="activity-item__time">{{ item.time }}</span>
+                  </div>
+                </li>
+              }
+            </ul>
+          </div>
+
+          <!-- Quick actions + contacts -->
+          <div class="right-col">
+            <div class="card quick-card">
+              <div class="card__header">
+                <h2 class="card__title">Quick Actions</h2>
+              </div>
+              <div class="quick-actions">
+                <button class="quick-btn quick-btn--blue"   (click)="navigateTo('apply')">
+                  <span>🏠</span> Apply
+                </button>
+                <button class="quick-btn quick-btn--orange" (click)="navigateTo('payments')">
+                  <span>💳</span> Pay Rent
+                </button>
+                <button class="quick-btn quick-btn--red"    (click)="navigateTo('complaints')">
+                  <span>🔧</span> Complaint
+                </button>
+                <button class="quick-btn quick-btn--green"  (click)="navigateTo('contract')">
+                  <span>📋</span> Contract
+                </button>
+                <button class="quick-btn quick-btn--purple" (click)="navigateTo('documents')">
+                  <span>📄</span> Documents
+                </button>
+                <button class="quick-btn quick-btn--teal"   (click)="navigateTo('profile')">
+                  <span>👤</span> Profile
+                </button>
+              </div>
+            </div>
+
+            <div class="card" style="margin-top: 1.25rem">
+              <div class="card__header">
+                <h2 class="card__title">Important Contacts</h2>
+              </div>
+              <div class="contact-list">
+                @for (c of importantContacts; track c.label) {
+                  <div class="contact-row">
+                    <span class="contact-icon">{{ c.icon }}</span>
+                    <div>
+                      <p class="contact-label">{{ c.label }}</p>
+                      <p class="contact-value">{{ c.value }}</p>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ─── PROFILE ───────────────────────────────────────────────── -->
+      @if (activeNav === 'profile') {
+        <div class="section">
+          <div class="section__header">
+            <div>
+              <h1 class="section__title">My Profile</h1>
+              <p class="section__subtitle">Manage your personal and academic information.</p>
+            </div>
+          </div>
+
+          @if (profileMsg) {
+            <div class="alert" [class.alert--success]="!profileErr" [class.alert--error]="profileErr"
+                 style="margin-bottom: 1.25rem">
+              {{ profileMsg }}
+            </div>
+          }
+
+          <div class="two-col">
+            <!-- Avatar + identity -->
+            <div class="card form-card">
+              <div class="profile-avatar">
+                <div class="avatar-circle">{{ student.initials }}</div>
+                <div class="avatar-info">
+                  <h3 class="avatar-name">{{ student.name }}</h3>
+                  <p class="avatar-id">ID: {{ student.studentId }}</p>
+                  <span class="badge badge--success" style="margin-top:0.4rem">Active Resident</span>
+                </div>
+              </div>
+
+              <h3 class="form-card__title" style="margin-top: 1.5rem">Personal Information</h3>
+              <div class="field-group">
+                <label class="field-label">Full Name</label>
+                <input type="text" class="field-input" [(ngModel)]="profileForm.name" />
+              </div>
+              <div class="field-group" style="margin-top: 0.85rem">
+                <label class="field-label">Email Address</label>
+                <input type="email" class="field-input" [(ngModel)]="profileForm.email" />
+              </div>
+              <div class="field-group" style="margin-top: 0.85rem">
+                <label class="field-label">Mobile Number</label>
+                <input type="text" class="field-input" [(ngModel)]="profileForm.mobile" />
+              </div>
+            </div>
+
+            <!-- Academic info -->
+            <div class="card form-card">
+              <h3 class="form-card__title">Academic Information</h3>
+              <div class="field-group">
+                <label class="field-label">Student ID</label>
+                <input type="text" class="field-input" [(ngModel)]="profileForm.studentId" />
+              </div>
+              <div class="field-group" style="margin-top: 0.85rem">
+                <label class="field-label">Course / Program</label>
+                <input type="text" class="field-input" [(ngModel)]="profileForm.course" />
+              </div>
+              <div class="field-group" style="margin-top: 0.85rem">
+                <label class="field-label">University / School</label>
+                <input type="text" class="field-input" [(ngModel)]="profileForm.university" />
+              </div>
+
+              <h3 class="form-card__title" style="margin-top: 1.75rem">Room Information</h3>
+              <div class="info-list">
+                <div class="info-row">
+                  <span class="info-icon">🏠</span>
+                  <div>
+                    <strong>Room {{ roomInfo.number }}</strong>
+                    <p>Floor {{ roomInfo.floor }} · {{ roomInfo.type }} Room</p>
+                  </div>
+                </div>
+                <div class="info-row">
+                  <span class="info-icon">📋</span>
+                  <div>
+                    <strong>Contract Status</strong>
+                    <p>
+                      <span class="badge" [ngClass]="badgeClass(contractInfo.status)">{{ contractInfo.status }}</span>
+                      &nbsp;until {{ contractInfo.endDate }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end">
+            <button class="btn-primary" (click)="saveProfile()">💾 Save Profile</button>
+          </div>
+        </div>
+      }
+
+      <!-- ─── DOCUMENTS ─────────────────────────────────────────────── -->
+      @if (activeNav === 'documents') {
+        <div class="section">
+          <div class="section__header">
+            <div>
+              <h1 class="section__title">My Documents</h1>
+              <p class="section__subtitle">Upload and manage your required dormitory documents.</p>
+            </div>
+          </div>
+
+          @if (docMsg) {
+            <div class="alert alert--success" style="margin-bottom: 1.25rem">✅ {{ docMsg }}</div>
+          }
+
+          <!-- Progress -->
+          <div class="card" style="margin-bottom: 1.25rem">
+            <div class="card__header">
+              <h3 class="card__title">Upload Progress</h3>
+              <span class="card__badge">{{ uploadedCount }}/{{ documents.length }} uploaded</span>
+            </div>
+            <div class="doc-progress-bar">
+              <div class="doc-progress-bar__fill"
+                   [style.width.%]="(uploadedCount / documents.length) * 100"></div>
+            </div>
+            <p class="doc-progress-note">
+              {{ requiredUploaded }}/{{ requiredCount }} required documents uploaded
+              @if (requiredUploaded < requiredCount) {
+                — <span style="color: var(--danger)">{{ requiredCount - requiredUploaded }} missing</span>
+              } @else {
+                — <span style="color: var(--success)">All required docs complete!</span>
+              }
+            </p>
+          </div>
+
+          <!-- Document cards -->
+          <div class="doc-grid">
+            @for (doc of documents; track doc.name) {
+              <div class="doc-card" [class.doc-card--uploaded]="doc.uploaded" [class.doc-card--missing]="!doc.uploaded">
+                <div class="doc-card__top">
+                  <span class="doc-card__icon">{{ doc.icon }}</span>
+                  <div class="doc-card__info">
+                    <h4 class="doc-card__name">{{ doc.name }}</h4>
+                    <p class="doc-card__meta">
+                      @if (doc.required) { <span class="doc-required">Required</span> }
+                      @else { <span class="doc-optional">Optional</span> }
+                    </p>
+                  </div>
+                </div>
+                <div class="doc-card__bottom">
+                  @if (doc.uploaded) {
+                    <div class="doc-status doc-status--ok">
+                      <span>✅</span> Uploaded {{ doc.date }}
+                    </div>
+                    <div class="doc-actions">
+                      <button class="link-btn">📥 Download</button>
+                      <button class="link-btn" (click)="simulateUpload(doc)">🔄 Replace</button>
+                    </div>
+                  } @else {
+                    <div class="doc-status doc-status--missing">
+                      <span>⚠️</span> Not uploaded yet
+                    </div>
+                    <button class="btn-primary btn-sm" (click)="simulateUpload(doc)">📤 Upload</button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- ─── MY CONTRACT ────────────────────────────────────────────── -->
+      @if (activeNav === 'contract') {
+        <div class="section">
+          <div class="section__header">
+            <div>
+              <h1 class="section__title">My Contract</h1>
+              <p class="section__subtitle">View your active dormitory contract details.</p>
+            </div>
+          </div>
+
+          <div class="two-col">
+            <!-- Contract details -->
+            <div class="card form-card">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem">
+                <h3 class="form-card__title" style="margin-bottom:0">Contract {{ contractInfo.contractId }}</h3>
+                <span class="badge badge--lg" [ngClass]="badgeClass(contractInfo.status)">{{ contractInfo.status }}</span>
+              </div>
+
+              <div class="contract-detail-list">
+                <div class="contract-detail-row">
+                  <span class="contract-detail-label">🏠 Room</span>
+                  <span class="contract-detail-value">Room {{ roomInfo.number }} — Floor {{ roomInfo.floor }} ({{ roomInfo.type }})</span>
+                </div>
+                <div class="contract-detail-row">
+                  <span class="contract-detail-label">📅 Start Date</span>
+                  <span class="contract-detail-value">{{ contractInfo.startDate }}</span>
+                </div>
+                <div class="contract-detail-row">
+                  <span class="contract-detail-label">📅 End Date</span>
+                  <span class="contract-detail-value">{{ contractInfo.endDate }}</span>
+                </div>
+                <div class="contract-detail-row">
+                  <span class="contract-detail-label">💳 Monthly Rent</span>
+                  <span class="contract-detail-value contract-detail-value--amount">
+                    ₱{{ contractInfo.monthlyRent | number }}
+                  </span>
+                </div>
+                <div class="contract-detail-row">
+                  <span class="contract-detail-label">📄 Contract ID</span>
+                  <span class="contract-detail-value td-mono">{{ contractInfo.contractId }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Contract actions -->
+            <div class="card form-card">
+              <h3 class="form-card__title">Contract Actions</h3>
+              <p class="form-card__desc">
+                Download your signed contract or upload an updated version if requested by management.
+              </p>
+
+              <div class="contract-action-list">
+                <div class="contract-action">
+                  <div>
+                    <strong>Download Contract</strong>
+                    <p>Get a copy of your signed dormitory agreement.</p>
+                  </div>
+                  <button class="btn-primary">📥 Download</button>
+                </div>
+                <div class="contract-action">
+                  <div>
+                    <strong>Upload Signed Contract</strong>
+                    <p>Upload a scanned copy of your signed contract.</p>
+                  </div>
+                  <button class="btn-primary">📤 Upload</button>
+                </div>
+                <div class="contract-action">
+                  <div>
+                    <strong>Download Receipts</strong>
+                    <p>Export all your payment receipts as PDF.</p>
+                  </div>
+                  <button class="btn-primary" (click)="generateReport()" [disabled]="reportLoading">
+                    @if (reportLoading) { <span class="spinner"></span> Generating… }
+                    @else { 📊 Export }
+                  </button>
+                </div>
+              </div>
+
+              @if (reportMsg) {
+                <div class="alert" [class.alert--success]="!reportErr" [class.alert--error]="reportErr"
+                     style="margin-top: 1rem">
+                  {{ reportMsg }}
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Timeline -->
+          <div class="card" style="margin-top: 1.25rem">
+            <div class="card__header">
+              <h3 class="card__title">Contract Timeline</h3>
+            </div>
+            <div class="timeline">
+              <div class="timeline-item timeline-item--done">
+                <span class="timeline-dot"></span>
+                <div>
+                  <strong>Application Submitted</strong>
+                  <p>Dec 20, 2025</p>
+                </div>
+              </div>
+              <div class="timeline-item timeline-item--done">
+                <span class="timeline-dot"></span>
+                <div>
+                  <strong>Application Accepted</strong>
+                  <p>Jan 5, 2026</p>
+                </div>
+              </div>
+              <div class="timeline-item timeline-item--done">
+                <span class="timeline-dot"></span>
+                <div>
+                  <strong>Contract Signed & Activated</strong>
+                  <p>Jan 15, 2026</p>
+                </div>
+              </div>
+              <div class="timeline-item timeline-item--active">
+                <span class="timeline-dot"></span>
+                <div>
+                  <strong>Active Contract Period</strong>
+                  <p>Jan 15, 2026 – Dec 15, 2026</p>
+                </div>
+              </div>
+              <div class="timeline-item timeline-item--pending">
+                <span class="timeline-dot"></span>
+                <div>
+                  <strong>Contract Expiry / Renewal</strong>
+                  <p>Dec 15, 2026</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ─── PAYMENTS ──────────────────────────────────────────────── -->
+      @if (activeNav === 'payments') {
+        <div class="section">
+          <div class="section__header">
+            <div>
+              <h1 class="section__title">Payments</h1>
+              <p class="section__subtitle">Submit rent payments and view your payment history.</p>
+            </div>
+          </div>
+
+          <div class="two-col">
+            <!-- Payment form -->
+            <div class="card form-card">
+              <h3 class="form-card__title">💳 Submit Payment</h3>
+              <div class="field-group">
+                <label class="field-label">Month</label>
+                <select class="field-input" [(ngModel)]="paymentMonth">
+                  <option value="" disabled>Select month…</option>
+                  @for (m of months; track m) {
+                    <option [value]="m">{{ m }}</option>
+                  }
+                </select>
+              </div>
+              <div class="field-group" style="margin-top: 0.85rem">
+                <label class="field-label">Amount (₱)</label>
+                <input type="number" class="field-input" placeholder="e.g. 5000"
+                       [(ngModel)]="paymentAmount" min="1" />
+              </div>
+              <button class="btn-primary btn-full" style="margin-top: 1.1rem"
+                      (click)="recordPayment()" [disabled]="paymentLoading">
+                @if (paymentLoading) { <span class="spinner"></span> Submitting… }
+                @else { Submit Payment }
+              </button>
+              @if (paymentMsg) {
+                <div class="alert" [class.alert--success]="!paymentErr" [class.alert--error]="paymentErr"
+                     style="margin-top: 0.85rem">
+                  {{ paymentMsg }}
+                </div>
+              }
+            </div>
+
+            <!-- Payment summary -->
+            <div class="card">
+              <div class="card__header">
+                <h3 class="card__title">My Payment Summary</h3>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Monthly Rent</span>
+                <span class="summary-value">₱{{ contractInfo.monthlyRent | number }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Last Payment</span>
+                <span class="summary-value summary-value--success">₱5,000 (Feb)</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Next Due</span>
+                <span class="summary-value summary-value--warning">{{ nextPayment.dueDate }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Balance</span>
+                <span class="summary-value summary-value--danger">₱5,000 outstanding</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Status</span>
+                <span class="summary-value">
+                  <span class="badge badge--warning">Pending</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Payment history -->
+          <div class="card table-card" style="margin-top: 1.25rem">
+            <div class="card__header" style="padding: 1rem 1.25rem 0">
+              <h3 class="card__title">Payment History</h3>
+              <button class="link-btn" (click)="generateReport()" [disabled]="reportLoading">
+                @if (reportLoading) { Generating… } @else { 📊 Export Report }
+              </button>
+            </div>
+            @if (paymentsError) {
+              <div class="alert alert--error" style="margin: 1rem">⚠️ {{ paymentsError }}</div>
+            } @else if (paymentsLoading) {
+              <div class="loading-state">Loading payments…</div>
+            } @else {
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Payment ID</th>
+                    <th>Month</th>
+                    <th>Amount</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (p of payments; track p.payment_id) {
+                    <tr>
+                      <td class="td-mono">#{{ p.payment_id }}</td>
+                      <td>{{ p.month }}</td>
+                      <td class="td-amount">₱{{ p.amount | number:'1.2-2' }}</td>
+                      <td class="td-muted">{{ p.created_at | date:'short' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="4" class="table-empty">
+                        No payments recorded yet. Connect the backend or submit one above.
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- ─── COMPLAINTS ─────────────────────────────────────────────── -->
+      @if (activeNav === 'complaints') {
+        <div class="section">
+          <div class="section__header">
+            <div>
+              <h1 class="section__title">My Complaints</h1>
+              <p class="section__subtitle">Submit and track your maintenance requests and complaints.</p>
+            </div>
+            <button class="btn-primary" (click)="showComplaintForm = !showComplaintForm">
+              {{ showComplaintForm ? '✕ Cancel' : '➕ New Complaint' }}
+            </button>
+          </div>
+
+          @if (showComplaintForm) {
+            <div class="card form-card">
+              <h3 class="form-card__title">Submit a Complaint or Request</h3>
+              <div class="field-group">
+                <label class="field-label">Title (optional)</label>
+                <input type="text" class="field-input" placeholder="e.g. Leaking faucet in bathroom"
+                       [(ngModel)]="newComplaintTitle" />
+              </div>
+              <div class="field-group" style="margin-top: 0.85rem">
+                <label class="field-label">Description</label>
+                <textarea class="field-input field-textarea"
+                          placeholder="Describe the issue in detail…"
+                          [(ngModel)]="newComplaint" rows="4"></textarea>
+              </div>
+              <button class="btn-primary" style="margin-top: 0.85rem" (click)="submitComplaint()">
+                Submit Complaint
+              </button>
+              @if (complaintMsg) {
+                <div class="alert" [class.alert--success]="!complaintErr" [class.alert--error]="complaintErr"
+                     style="margin-top: 0.75rem">
+                  {{ complaintMsg }}
+                </div>
+              }
+            </div>
+          }
+
+          @if (complaintsError) {
+            <div class="alert alert--error">⚠️ {{ complaintsError }}</div>
+          }
+
+          @if (complaintsLoading) {
+            <div class="loading-state">Loading complaints…</div>
+          } @else {
+            <div class="card table-card">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (c of complaints; track c.complaint_id) {
+                    <tr>
+                      <td class="td-mono">#{{ c.complaint_id }}</td>
+                      <td class="td-desc">{{ c.description }}</td>
+                      <td><span class="badge" [ngClass]="badgeClass(c.status)">{{ c.status }}</span></td>
+                      <td class="td-muted">{{ c.created_at | date:'short' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="4" class="table-empty">
+                        No complaints yet. Use the button above to submit one.
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ─── APPLY ──────────────────────────────────────────────────── -->
+      @if (activeNav === 'apply') {
+        <div class="section">
+          <div class="section__header">
+            <div>
+              <h1 class="section__title">Dorm Application</h1>
+              <p class="section__subtitle">Apply for dormitory accommodation or track your existing application.</p>
+            </div>
+            <button class="btn-primary" (click)="showAppForm = !showAppForm">
+              {{ showAppForm ? '✕ Cancel' : '➕ New Application' }}
+            </button>
+          </div>
+
+          @if (showAppForm) {
+            <div class="card form-card">
+              <h3 class="form-card__title">Apply for Dormitory</h3>
+              <p class="form-card__desc">
+                Fill in your preferred move-in date. Our team will review your application and
+                notify you via email within 3–5 business days.
+              </p>
+
+              <div class="field-group">
+                <label class="field-label">Preferred Move-in Date</label>
+                <input type="date" class="field-input" [(ngModel)]="newAppDate" />
+              </div>
+
+              <div class="apply-checklist">
+                <p class="field-label" style="margin-bottom: 0.5rem">Required Documents (upload in Documents section)</p>
+                <div class="checklist-item" [class.checklist-item--done]="documents[0].uploaded">
+                  <span>{{ documents[0].uploaded ? '✅' : '⬜' }}</span> Enrollment Certificate
+                </div>
+                <div class="checklist-item" [class.checklist-item--done]="documents[1].uploaded">
+                  <span>{{ documents[1].uploaded ? '✅' : '⬜' }}</span> Student ID
+                </div>
+                <div class="checklist-item" [class.checklist-item--done]="documents[2].uploaded">
+                  <span>{{ documents[2].uploaded ? '✅' : '⬜' }}</span> Residence Card
+                </div>
+              </div>
+
+              <button class="btn-primary" style="margin-top: 1rem" (click)="submitApplication()">
+                Submit Application
+              </button>
+              @if (appMsg) {
+                <div class="alert" [class.alert--success]="!appErr" [class.alert--error]="appErr"
+                     style="margin-top: 0.85rem">
+                  {{ appMsg }}
+                </div>
+              }
+            </div>
+          }
+
+          @if (appsError) {
+            <div class="alert alert--error">⚠️ {{ appsError }}</div>
+          }
+
+          @if (appsLoading) {
+            <div class="loading-state">Loading applications…</div>
+          } @else {
+            <div class="card table-card">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>App ID</th>
+                    <th>Preferred Date</th>
+                    <th>Status</th>
+                    <th>Submitted At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (app of applications; track app.application_id) {
+                    <tr>
+                      <td class="td-mono">#{{ app.application_id }}</td>
+                      <td>{{ app.submission_date | date:'mediumDate' }}</td>
+                      <td><span class="badge" [ngClass]="badgeClass(app.status)">{{ app.status }}</span></td>
+                      <td class="td-muted">{{ app.created_at | date:'short' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="4" class="table-empty">
+                        No applications found. Connect the backend or submit one above.
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /layout -->

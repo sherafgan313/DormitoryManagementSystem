@@ -233,28 +233,52 @@
             <div class="loading-state">Loading applications…</div>
           } @else {
             <div class="card table-card">
+              @if (appMsg) {
+                <div class="alert" [class.alert--success]="!appErr" [class.alert--error]="appErr"
+                     style="margin: 0.75rem 1.25rem">
+                  {{ appMsg }}
+                </div>
+              }
               <table class="data-table">
                 <thead>
                   <tr>
                     <th>App ID</th>
-                    <th>User ID</th>
-                    <th>Submission Date</th>
+                    <th>Student</th>
+                    <th>Preferred Date</th>
                     <th>Status</th>
-                    <th>Created At</th>
+                    <th>Submitted</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (app of applications; track app.application_id) {
                     <tr>
                       <td class="td-mono">#{{ app.application_id }}</td>
-                      <td>User {{ app.user_id }}</td>
+                      <td>
+                        <span class="td-name">{{ app.user_name ?? 'User ' + app.user_id }}</span>
+                        @if (app.user_email) {
+                          <span class="td-sub">{{ app.user_email }}</span>
+                        }
+                      </td>
                       <td>{{ app.submission_date | date:'mediumDate' }}</td>
                       <td><span class="badge" [ngClass]="badgeClass(app.status)">{{ app.status }}</span></td>
                       <td class="td-muted">{{ app.created_at | date:'short' }}</td>
+                      <td class="td-actions">
+                        @if (app.status === 'PENDING') {
+                          <button class="action-btn action-btn--accept"
+                                  (click)="updateApplicationStatus(app.application_id, 'ACCEPTED')">
+                            ✓ Accept
+                          </button>
+                          <button class="action-btn action-btn--reject"
+                                  (click)="updateApplicationStatus(app.application_id, 'REJECTED')">
+                            ✕ Reject
+                          </button>
+                        }
+                      </td>
                     </tr>
                   } @empty {
                     <tr>
-                      <td colspan="5" class="table-empty">
+                      <td colspan="6" class="table-empty">
                         No applications found. Connect the backend or submit one above.
                       </td>
                     </tr>
@@ -414,28 +438,53 @@
             <div class="loading-state">Loading complaints…</div>
           } @else {
             <div class="card table-card">
+              @if (complaintMsg) {
+                <div class="alert" [class.alert--success]="!complaintErr" [class.alert--error]="complaintErr"
+                     style="margin: 0.75rem 1.25rem">
+                  {{ complaintMsg }}
+                </div>
+              }
               <table class="data-table">
                 <thead>
                   <tr>
                     <th>ID</th>
-                    <th>User ID</th>
+                    <th>Student</th>
                     <th>Description</th>
                     <th>Status</th>
                     <th>Date</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (c of complaints; track c.complaint_id) {
                     <tr>
                       <td class="td-mono">#{{ c.complaint_id }}</td>
-                      <td>User {{ c.user_id }}</td>
+                      <td>
+                        <span class="td-name">{{ c.user_name ?? 'User ' + c.user_id }}</span>
+                        @if (c.user_email) {
+                          <span class="td-sub">{{ c.user_email }}</span>
+                        }
+                      </td>
                       <td class="td-desc">{{ c.description }}</td>
                       <td><span class="badge" [ngClass]="badgeClass(c.status)">{{ c.status }}</span></td>
                       <td class="td-muted">{{ c.created_at | date:'short' }}</td>
+                      <td class="td-actions">
+                        @if (c.status === 'SUBMITTED') {
+                          <button class="action-btn action-btn--info"
+                                  (click)="updateComplaintStatus(c.complaint_id, 'IN_PROGRESS')">
+                            ▶ In Progress
+                          </button>
+                        } @else if (c.status === 'IN_PROGRESS') {
+                          <button class="action-btn action-btn--accept"
+                                  (click)="updateComplaintStatus(c.complaint_id, 'RESOLVED')">
+                            ✓ Resolve
+                          </button>
+                        }
+                      </td>
                     </tr>
                   } @empty {
                     <tr>
-                      <td colspan="5" class="table-empty">
+                      <td colspan="6" class="table-empty">
                         No complaints found. Connect the backend or submit one above.
                       </td>
                     </tr>

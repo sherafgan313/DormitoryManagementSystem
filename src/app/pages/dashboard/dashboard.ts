@@ -27,6 +27,8 @@ interface Application {
   submission_date: string;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
   created_at: string;
+  user_name?: string;
+  user_email?: string;
 }
 
 interface Complaint {
@@ -35,6 +37,8 @@ interface Complaint {
   description: string;
   status: 'SUBMITTED' | 'IN_PROGRESS' | 'RESOLVED';
   created_at: string;
+  user_name?: string;
+  user_email?: string;
 }
 
 interface Room {
@@ -189,7 +193,33 @@ export class DashboardComponent implements OnInit {
 
   constructor(private router: Router, private api: ApiService, private auth: AuthService) {}
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    this.loadAdminStats();
+  }
+
+  // ── Admin stats ───────────────────────────────────────────────────
+  loadAdminStats(): void {
+    this.api.getStats().subscribe({
+      next: (data) => {
+        // Occupied ← active contracts; Vacant ← remainder of 128
+        this.stats[1].value  = data.activeContracts;
+        this.stats[1].change = `${Math.round(data.activeContracts / 128 * 100)}% occupancy`;
+        this.stats[2].value  = 128 - data.activeContracts;
+        this.stats[2].change = `${128 - data.activeContracts} available`;
+        // Pending applications (was "Pending Payments")
+        this.stats[3].label  = 'Pending Apps';
+        this.stats[3].value  = data.pendingApplications;
+        this.stats[3].change = data.pendingApplications > 0 ? 'Awaiting review' : 'All reviewed';
+        // Open complaints
+        this.stats[4].value  = data.openComplaints;
+        this.stats[4].change = `${data.openComplaints} unresolved`;
+        // Total students
+        this.stats[5].value  = data.totalStudents;
+        this.stats[5].change = 'Registered students';
+      },
+      error: () => {} // keep static fallback values on error
+    });
+  }
 
   get pageName(): string {
     return this.navItems.find(n => n.id === this.activeNav)?.label ?? 'Dashboard';
@@ -233,6 +263,18 @@ export class DashboardComponent implements OnInit {
   }
 
   // ── Applications ──────────────────────────────────────────────────
+  updateApplicationStatus(appId: number, status: 'ACCEPTED' | 'REJECTED'): void {
+    this.api.updateApplicationStatus(appId, status).subscribe({
+      next: () => {
+        this.appMsg = `Application #${appId} ${status.toLowerCase()}.`;
+        this.appErr = false;
+        this.loadApplications();
+        this.loadAdminStats();
+      },
+      error: () => { this.appMsg = 'Failed to update status.'; this.appErr = true; },
+    });
+  }
+
   loadApplications(): void {
     this.appsLoading = true;
     this.appsError = '';
@@ -260,6 +302,18 @@ export class DashboardComponent implements OnInit {
   }
 
   // ── Complaints ────────────────────────────────────────────────────
+  updateComplaintStatus(id: number, status: 'IN_PROGRESS' | 'RESOLVED'): void {
+    this.api.updateComplaintStatus(id, status).subscribe({
+      next: () => {
+        this.complaintMsg = `Complaint #${id} marked as ${status.replace('_', ' ').toLowerCase()}.`;
+        this.complaintErr = false;
+        this.loadComplaints();
+        this.loadAdminStats();
+      },
+      error: () => { this.complaintMsg = 'Failed to update status.'; this.complaintErr = true; },
+    });
+  }
+
   loadComplaints(): void {
     this.complaintsLoading = true;
     this.complaintsError = '';
