@@ -81,8 +81,15 @@
   }
   &__sub { color: var(--text-secondary); font-size: 0.9rem; }
 
-  &__hint {
+  &__hints {
     margin-top: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  &__hint {
+    margin-top: 0;
     font-size: 0.8rem;
     color: var(--text-muted);
     text-align: center;

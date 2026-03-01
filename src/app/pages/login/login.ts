@@ -31,15 +31,18 @@ export class LoginComponent {
     }
     this.loading = true;
     this.auth.login(this.email, this.password).subscribe({
-      next: () => {
+      next: (res: any) => {
         this.loading = false;
-        this.router.navigate(['/dashboard']);
+        const role = res?.role ?? res?.user?.role;
+        this.router.navigate([role === 'STUDENT' ? '/student-dashboard' : '/dashboard']);
       },
       error: () => {
         this.loading = false;
         // Demo fallback when backend is offline
         if (this.email === 'admin@dms.com' && this.password === 'admin123') {
           this.router.navigate(['/dashboard']);
+        } else if (this.email === 'student@dms.com' && this.password === 'student123') {
+          this.router.navigate(['/student-dashboard']);
         } else {
           this.errorMsg = 'Invalid email or password.';
         }

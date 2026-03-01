@@ -19,7 +19,7 @@
     <div class="login-card">
       <div class="login-card__header">
         <h1 class="login-card__title">Welcome back</h1>
-        <p class="login-card__sub">Sign in to your admin account</p>
+        <p class="login-card__sub">Sign in to your account</p>
       </div>
 
       <form class="login-form" (ngSubmit)="onSubmit()" #loginForm="ngForm" novalidate>
@@ -82,9 +82,10 @@
         </button>
       </form>
 
-      <p class="login-card__hint">
-        Demo credentials: <code>admin&#64;dms.com</code> / <code>admin123</code>
-      </p>
+      <div class="login-card__hints">
+        <p class="login-card__hint"><span>🛡️ Admin —</span> <code>admin&#64;dms.com</code> / <code>admin123</code></p>
+        <p class="login-card__hint"><span>🎓 Student —</span> <code>student&#64;dms.com</code> / <code>student123</code></p>
+      </div>
     </div>
   </div>
 </div>
