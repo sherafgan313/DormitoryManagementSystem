@@ -1,0 +1,90 @@
+<div class="login-page">
+  <!-- Left panel -->
+  <div class="login-page__panel">
+    <div class="login-page__brand" (click)="goHome()">
+      <span class="login-page__brand-icon">🏢</span>
+      <span class="login-page__brand-name">DormMS</span>
+    </div>
+    <h2 class="login-page__tagline">Manage your dormitory<br />with confidence.</h2>
+    <ul class="login-page__perks">
+      <li><span>✅</span> Real-time room availability</li>
+      <li><span>✅</span> Automated billing & invoices</li>
+      <li><span>✅</span> Maintenance ticket tracking</li>
+      <li><span>✅</span> Comprehensive reports</li>
+    </ul>
+  </div>
+
+  <!-- Right form -->
+  <div class="login-page__form-wrap">
+    <div class="login-card">
+      <div class="login-card__header">
+        <h1 class="login-card__title">Welcome back</h1>
+        <p class="login-card__sub">Sign in to your admin account</p>
+      </div>
+
+      <form class="login-form" (ngSubmit)="onSubmit()" #loginForm="ngForm" novalidate>
+        @if (errorMsg) {
+          <div class="login-form__error">
+            <span>⚠️</span> {{ errorMsg }}
+          </div>
+        }
+
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address</label>
+          <div class="form-input-wrap">
+            <span class="form-input-icon">✉️</span>
+            <input
+              id="email"
+              type="email"
+              class="form-input"
+              placeholder="admin@dms.com"
+              [(ngModel)]="email"
+              name="email"
+              autocomplete="email"
+              required
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <div class="form-input-wrap">
+            <span class="form-input-icon">🔒</span>
+            <input
+              id="password"
+              [type]="showPassword ? 'text' : 'password'"
+              class="form-input form-input--padded-right"
+              placeholder="Enter your password"
+              [(ngModel)]="password"
+              name="password"
+              autocomplete="current-password"
+              required
+            />
+            <button type="button" class="form-input-toggle" (click)="togglePassword()">
+              {{ showPassword ? '🙈' : '👁️' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="login-form__meta">
+          <label class="form-check">
+            <input type="checkbox" name="remember" /> Remember me
+          </label>
+          <a href="#" class="login-form__forgot">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="btn btn--primary btn--full" [disabled]="loading">
+          @if (loading) {
+            <span class="spinner"></span> Signing in...
+          } @else {
+            Sign In
+          }
+        </button>
+      </form>
+
+      <p class="login-card__hint">
+        Demo credentials: <code>admin&#64;dms.com</code> / <code>admin123</code>
+      </p>
+    </div>
+  </div>
+</div>
