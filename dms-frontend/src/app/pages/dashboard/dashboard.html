@@ -1,0 +1,153 @@
+<div class="layout" [class.layout--collapsed]="!sidebarOpen">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <span class="sidebar__brand-icon">🏢</span>
+      @if (sidebarOpen) {
+        <span class="sidebar__brand-name">DormMS</span>
+      }
+    </div>
+
+    <nav class="sidebar__nav">
+      @for (item of navItems; track item.id) {
+        <button
+          class="sidebar__nav-item"
+          [class.sidebar__nav-item--active]="activeNav === item.id"
+          (click)="setActive(item.id)"
+        >
+          <span class="sidebar__nav-icon">{{ item.icon }}</span>
+          @if (sidebarOpen) {
+            <span class="sidebar__nav-label">{{ item.label }}</span>
+          }
+        </button>
+      }
+    </nav>
+
+    <button class="sidebar__logout" (click)="logout()">
+      <span>🚪</span>
+      @if (sidebarOpen) {
+        <span>Logout</span>
+      }
+    </button>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <div class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar__left">
+        <button class="topbar__toggle" (click)="toggleSidebar()">
+          {{ sidebarOpen ? '◀' : '▶' }}
+        </button>
+        <div class="topbar__breadcrumb">
+          <span class="topbar__page">Dashboard</span>
+        </div>
+      </div>
+      <div class="topbar__right">
+        <button class="topbar__icon-btn" title="Notifications">🔔</button>
+        <div class="topbar__avatar">
+          <span>A</span>
+        </div>
+        <div class="topbar__user">
+          <span class="topbar__user-name">Admin</span>
+          <span class="topbar__user-role">Administrator</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- PAGE BODY -->
+    <div class="content">
+      <!-- Welcome -->
+      <div class="content__welcome">
+        <div>
+          <h1 class="content__title">Good morning, Admin 👋</h1>
+          <p class="content__subtitle">Here's what's happening in your dormitory today.</p>
+        </div>
+        <span class="content__date">March 1, 2025</span>
+      </div>
+
+      <!-- Stat cards -->
+      <div class="stats-grid">
+        @for (stat of stats; track stat.label) {
+          <div class="stat-card stat-card--{{ stat.color }}">
+            <div class="stat-card__top">
+              <span class="stat-card__icon">{{ stat.icon }}</span>
+              <span class="stat-card__label">{{ stat.label }}</span>
+            </div>
+            <div class="stat-card__value">{{ stat.value }}</div>
+            <div class="stat-card__change" [class.stat-card__change--positive]="stat.positive"
+                                           [class.stat-card__change--negative]="!stat.positive">
+              {{ stat.positive ? '▲' : '▼' }} {{ stat.change }}
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Bottom row -->
+      <div class="bottom-row">
+
+        <!-- Recent activity -->
+        <div class="card activity-card">
+          <div class="card__header">
+            <h2 class="card__title">Recent Activity</h2>
+            <button class="card__action">View all</button>
+          </div>
+          <ul class="activity-list">
+            @for (item of recentActivity; track item.message) {
+              <li class="activity-item">
+                <span class="activity-item__icon">{{ item.icon }}</span>
+                <div class="activity-item__info">
+                  <p class="activity-item__msg">{{ item.message }}</p>
+                  <span class="activity-item__time">{{ item.time }}</span>
+                </div>
+              </li>
+            }
+          </ul>
+        </div>
+
+        <!-- Quick actions -->
+        <div class="card quick-card">
+          <div class="card__header">
+            <h2 class="card__title">Quick Actions</h2>
+          </div>
+          <div class="quick-actions">
+            <button class="quick-btn quick-btn--blue">
+              <span>➕</span> Add Resident
+            </button>
+            <button class="quick-btn quick-btn--green">
+              <span>🏠</span> Assign Room
+            </button>
+            <button class="quick-btn quick-btn--orange">
+              <span>💳</span> Record Payment
+            </button>
+            <button class="quick-btn quick-btn--red">
+              <span>🔧</span> Log Request
+            </button>
+            <button class="quick-btn quick-btn--purple">
+              <span>📢</span> Post Notice
+            </button>
+            <button class="quick-btn quick-btn--teal">
+              <span>📊</span> Generate Report
+            </button>
+          </div>
+
+          <!-- Occupancy chart placeholder -->
+          <div class="card__header" style="margin-top: 1.5rem;">
+            <h2 class="card__title">Occupancy</h2>
+            <span class="card__badge">81%</span>
+          </div>
+          <div class="occupancy-bar">
+            <div class="occupancy-bar__fill" style="width: 81%"></div>
+          </div>
+          <div class="occupancy-legend">
+            <span><span class="dot dot--occupied"></span> Occupied (104)</span>
+            <span><span class="dot dot--vacant"></span> Vacant (24)</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>

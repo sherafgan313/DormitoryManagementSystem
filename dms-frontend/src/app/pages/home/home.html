@@ -1,0 +1,77 @@
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="navbar__brand">
+    <span class="navbar__icon">🏢</span>
+    <span class="navbar__name">DormMS</span>
+  </div>
+  <ul class="navbar__links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#about">About</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ul>
+  <button class="btn btn--outline" (click)="goToLogin()">Sign In</button>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero__badge">Dormitory Management System</div>
+  <h1 class="hero__title">
+    Manage Your Dormitory<br />
+    <span class="hero__title--accent">Smarter & Faster</span>
+  </h1>
+  <p class="hero__subtitle">
+    A complete platform to manage rooms, residents, payments, and maintenance — all in one place.
+  </p>
+  <div class="hero__actions">
+    <button class="btn btn--primary btn--lg" (click)="goToLogin()">Get Started</button>
+    <a href="#features" class="btn btn--ghost btn--lg">Learn More</a>
+  </div>
+  <div class="hero__stats">
+    <div class="hero__stat">
+      <strong>500+</strong>
+      <span>Rooms Managed</span>
+    </div>
+    <div class="hero__divider"></div>
+    <div class="hero__stat">
+      <strong>1,200+</strong>
+      <span>Residents Served</span>
+    </div>
+    <div class="hero__divider"></div>
+    <div class="hero__stat">
+      <strong>98%</strong>
+      <span>Satisfaction Rate</span>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+  <div class="features__header">
+    <h2>Everything You Need</h2>
+    <p>Powerful tools built for dormitory administrators and managers.</p>
+  </div>
+  <div class="features__grid">
+    @for (f of features; track f.title) {
+      <div class="feature-card">
+        <div class="feature-card__icon">{{ f.icon }}</div>
+        <h3 class="feature-card__title">{{ f.title }}</h3>
+        <p class="feature-card__desc">{{ f.desc }}</p>
+      </div>
+    }
+  </div>
+</section>
+
+<!-- CTA BANNER -->
+<section class="cta-banner">
+  <h2>Ready to streamline your dormitory?</h2>
+  <p>Sign in to your admin portal and get started in minutes.</p>
+  <button class="btn btn--primary btn--lg" (click)="goToLogin()">Access Dashboard</button>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer__brand">
+    <span>🏢</span> DormMS &copy; 2025
+  </div>
+  <p class="footer__note">Dormitory Management System — Built for efficiency.</p>
+</footer>
