@@ -23,8 +23,21 @@ db.connect((err) => {
     console.error("DB connection failed:", err);
   } else {
     console.log("MySQL Connected");
+    seedAdmin();
   }
 });
+
+async function seedAdmin() {
+  db.query("SELECT user_id FROM users WHERE email = 'admin@dms.com'", async (err, results) => {
+    if (err || results.length > 0) return;
+    const hash = await bcrypt.hash("admin123", 10);
+    db.query(
+      "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)",
+      ["Admin", "admin@dms.com", hash, "ADMIN"],
+      (err) => { if (!err) console.log("Admin user seeded: admin@dms.com / admin123"); }
+    );
+  });
+}
 
 
 // ================= AUTH =================
@@ -161,6 +174,13 @@ app.post("/api/payments", authMiddleware, (req, res) => {
   });
 });
 
+app.get("/api/payments", authMiddleware, (req, res) => {
+  db.query("SELECT * FROM rent_payments ORDER BY created_at DESC", (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
 
 // ================= REPORT =================
 
@@ -171,6 +191,13 @@ app.post("/api/reports", authMiddleware, (req, res) => {
   db.query(sql, [req.user.id, "report/path/sample.pdf"], (err, result) => {
     if (err) return res.status(500).json(err);
     res.json({ message: "Report created" });
+  });
+});
+
+app.get("/api/reports", authMiddleware, (req, res) => {
+  db.query("SELECT * FROM reports ORDER BY generation_date DESC", (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
   });
 });
 

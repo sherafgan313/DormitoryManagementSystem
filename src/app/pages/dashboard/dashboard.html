@@ -1,6 +1,6 @@
 <div class="layout" [class.layout--collapsed]="!sidebarOpen">
 
-  <!-- SIDEBAR -->
+  <!-- ═══ SIDEBAR ════════════════════════════════════════════════════ -->
   <aside class="sidebar">
     <div class="sidebar__brand">
       <span class="sidebar__brand-icon">🏢</span>
@@ -26,13 +26,11 @@
 
     <button class="sidebar__logout" (click)="logout()">
       <span>🚪</span>
-      @if (sidebarOpen) {
-        <span>Logout</span>
-      }
+      @if (sidebarOpen) { <span>Logout</span> }
     </button>
   </aside>
 
-  <!-- MAIN CONTENT -->
+  <!-- ═══ MAIN ════════════════════════════════════════════════════════ -->
   <div class="main">
 
     <!-- TOPBAR -->
@@ -41,15 +39,11 @@
         <button class="topbar__toggle" (click)="toggleSidebar()">
           {{ sidebarOpen ? '◀' : '▶' }}
         </button>
-        <div class="topbar__breadcrumb">
-          <span class="topbar__page">Dashboard</span>
-        </div>
+        <span class="topbar__page">{{ pageName }}</span>
       </div>
       <div class="topbar__right">
         <button class="topbar__icon-btn" title="Notifications">🔔</button>
-        <div class="topbar__avatar">
-          <span>A</span>
-        </div>
+        <div class="topbar__avatar"><span>A</span></div>
         <div class="topbar__user">
           <span class="topbar__user-name">Admin</span>
           <span class="topbar__user-role">Administrator</span>
@@ -57,97 +51,590 @@
       </div>
     </header>
 
-    <!-- PAGE BODY -->
+    <!-- ═══ CONTENT ══════════════════════════════════════════════════ -->
     <div class="content">
-      <!-- Welcome -->
-      <div class="content__welcome">
-        <div>
-          <h1 class="content__title">Good morning, Admin 👋</h1>
-          <p class="content__subtitle">Here's what's happening in your dormitory today.</p>
+
+      <!-- ─── DASHBOARD OVERVIEW ──────────────────────────────────── -->
+      @if (activeNav === 'dashboard') {
+        <div class="content__welcome">
+          <div>
+            <h1 class="content__title">Good morning, Admin 👋</h1>
+            <p class="content__subtitle">Here's what's happening in your dormitory today.</p>
+          </div>
+          <span class="content__date">March 1, 2026</span>
         </div>
-        <span class="content__date">March 1, 2025</span>
-      </div>
 
-      <!-- Stat cards -->
-      <div class="stats-grid">
-        @for (stat of stats; track stat.label) {
-          <div class="stat-card stat-card--{{ stat.color }}">
-            <div class="stat-card__top">
-              <span class="stat-card__icon">{{ stat.icon }}</span>
-              <span class="stat-card__label">{{ stat.label }}</span>
+        <div class="stats-grid">
+          @for (stat of stats; track stat.label) {
+            <div class="stat-card stat-card--{{ stat.color }}">
+              <div class="stat-card__top">
+                <span class="stat-card__icon">{{ stat.icon }}</span>
+                <span class="stat-card__label">{{ stat.label }}</span>
+              </div>
+              <div class="stat-card__value">{{ stat.value }}</div>
+              <div class="stat-card__change"
+                   [class.stat-card__change--positive]="stat.positive"
+                   [class.stat-card__change--negative]="!stat.positive">
+                {{ stat.positive ? '▲' : '▼' }} {{ stat.change }}
+              </div>
             </div>
-            <div class="stat-card__value">{{ stat.value }}</div>
-            <div class="stat-card__change" [class.stat-card__change--positive]="stat.positive"
-                                           [class.stat-card__change--negative]="!stat.positive">
-              {{ stat.positive ? '▲' : '▼' }} {{ stat.change }}
+          }
+        </div>
+
+        <div class="bottom-row">
+          <!-- Recent activity -->
+          <div class="card activity-card">
+            <div class="card__header">
+              <h2 class="card__title">Recent Activity</h2>
+              <button class="card__action" (click)="navigateTo('requests')">View all</button>
+            </div>
+            <ul class="activity-list">
+              @for (item of recentActivity; track item.message) {
+                <li class="activity-item">
+                  <span class="activity-item__icon">{{ item.icon }}</span>
+                  <div class="activity-item__info">
+                    <p class="activity-item__msg">{{ item.message }}</p>
+                    <span class="activity-item__time">{{ item.time }}</span>
+                  </div>
+                </li>
+              }
+            </ul>
+          </div>
+
+          <!-- Quick actions + occupancy -->
+          <div class="card quick-card">
+            <div class="card__header">
+              <h2 class="card__title">Quick Actions</h2>
+            </div>
+            <div class="quick-actions">
+              <button class="quick-btn quick-btn--blue"   (click)="navigateTo('residents')">
+                <span>📋</span> Applications
+              </button>
+              <button class="quick-btn quick-btn--green"  (click)="navigateTo('rooms')">
+                <span>🏠</span> View Rooms
+              </button>
+              <button class="quick-btn quick-btn--orange" (click)="navigateTo('payments')">
+                <span>💳</span> Record Payment
+              </button>
+              <button class="quick-btn quick-btn--red"    (click)="navigateTo('requests')">
+                <span>🔧</span> Complaints
+              </button>
+              <button class="quick-btn quick-btn--purple" (click)="navigateTo('reports')">
+                <span>📊</span> Gen. Report
+              </button>
+              <button class="quick-btn quick-btn--teal"   (click)="navigateTo('settings')">
+                <span>⚙️</span> Settings
+              </button>
+            </div>
+
+            <div class="card__header" style="margin-top:1.5rem">
+              <h2 class="card__title">Occupancy</h2>
+              <span class="card__badge">81%</span>
+            </div>
+            <div class="occupancy-bar">
+              <div class="occupancy-bar__fill" style="width:81%"></div>
+            </div>
+            <div class="occupancy-legend">
+              <span><span class="dot dot--occupied"></span> Occupied (104)</span>
+              <span><span class="dot dot--vacant"></span> Vacant (24)</span>
             </div>
           </div>
-        }
-      </div>
+        </div>
+      }
 
-      <!-- Bottom row -->
-      <div class="bottom-row">
-
-        <!-- Recent activity -->
-        <div class="card activity-card">
-          <div class="card__header">
-            <h2 class="card__title">Recent Activity</h2>
-            <button class="card__action">View all</button>
+      <!-- ─── ROOMS ─────────────────────────────────────────────────── -->
+      @if (activeNav === 'rooms') {
+        <div class="section">
+          <div class="section__header">
+            <div>
+              <h1 class="section__title">Room Management</h1>
+              <p class="section__subtitle">Overview of all {{ rooms.length }} rooms across 4 floors.</p>
+            </div>
+            <div class="room-legend">
+              <span class="legend-item"><span class="dot dot--occupied"></span> Occupied</span>
+              <span class="legend-item"><span class="dot dot--vacant"></span> Vacant</span>
+              <span class="legend-item"><span class="dot dot--maintenance"></span> Maintenance</span>
+            </div>
           </div>
-          <ul class="activity-list">
-            @for (item of recentActivity; track item.message) {
-              <li class="activity-item">
-                <span class="activity-item__icon">{{ item.icon }}</span>
-                <div class="activity-item__info">
-                  <p class="activity-item__msg">{{ item.message }}</p>
-                  <span class="activity-item__time">{{ item.time }}</span>
+
+          <div class="filter-tabs">
+            <button class="filter-tab" [class.filter-tab--active]="roomFilter==='all'"         (click)="roomFilter='all'">All ({{ rooms.length }})</button>
+            <button class="filter-tab" [class.filter-tab--active]="roomFilter==='occupied'"    (click)="roomFilter='occupied'">Occupied ({{ occupiedCount }})</button>
+            <button class="filter-tab" [class.filter-tab--active]="roomFilter==='vacant'"      (click)="roomFilter='vacant'">Vacant ({{ vacantCount }})</button>
+            <button class="filter-tab" [class.filter-tab--active]="roomFilter==='maintenance'" (click)="roomFilter='maintenance'">Maintenance ({{ maintenanceCount }})</button>
+          </div>
+
+          @if (filteredRooms.length === 0) {
+            <div class="empty-state">No rooms match the selected filter.</div>
+          } @else {
+            @for (floor of floors; track floor) {
+              <div class="floor-section">
+                <h3 class="floor-title">Floor {{ floor }}</h3>
+                <div class="room-grid">
+                  @for (room of roomsOnFloor(floor); track room.number) {
+                    <div class="room-card room-card--{{ room.status }}">
+                      <div class="room-card__number">{{ room.number }}</div>
+                      <div class="room-card__type">{{ room.type }}</div>
+                      @if (room.status === 'occupied') {
+                        <div class="room-card__resident">{{ room.resident }}</div>
+                        <span class="badge badge--success">Occupied</span>
+                      } @else if (room.status === 'vacant') {
+                        <div class="room-card__resident room-card__resident--empty">Available</div>
+                        <span class="badge badge--default">Vacant</span>
+                      } @else {
+                        <div class="room-card__resident room-card__resident--empty">Under Repair</div>
+                        <span class="badge badge--danger">Maintenance</span>
+                      }
+                    </div>
+                  }
                 </div>
-              </li>
+              </div>
             }
-          </ul>
+          }
         </div>
+      }
 
-        <!-- Quick actions -->
-        <div class="card quick-card">
-          <div class="card__header">
-            <h2 class="card__title">Quick Actions</h2>
-          </div>
-          <div class="quick-actions">
-            <button class="quick-btn quick-btn--blue">
-              <span>➕</span> Add Resident
-            </button>
-            <button class="quick-btn quick-btn--green">
-              <span>🏠</span> Assign Room
-            </button>
-            <button class="quick-btn quick-btn--orange">
-              <span>💳</span> Record Payment
-            </button>
-            <button class="quick-btn quick-btn--red">
-              <span>🔧</span> Log Request
-            </button>
-            <button class="quick-btn quick-btn--purple">
-              <span>📢</span> Post Notice
-            </button>
-            <button class="quick-btn quick-btn--teal">
-              <span>📊</span> Generate Report
+      <!-- ─── RESIDENTS / APPLICATIONS ─────────────────────────────── -->
+      @if (activeNav === 'residents') {
+        <div class="section">
+          <div class="section__header">
+            <div>
+              <h1 class="section__title">Dorm Applications</h1>
+              <p class="section__subtitle">All student applications and their current status.</p>
+            </div>
+            <button class="btn-primary" (click)="showAppForm = !showAppForm">
+              {{ showAppForm ? '✕ Cancel' : '➕ New Application' }}
             </button>
           </div>
 
-          <!-- Occupancy chart placeholder -->
-          <div class="card__header" style="margin-top: 1.5rem;">
-            <h2 class="card__title">Occupancy</h2>
-            <span class="card__badge">81%</span>
+          @if (showAppForm) {
+            <div class="card form-card">
+              <h3 class="form-card__title">Submit New Application</h3>
+              <div class="form-inline">
+                <div class="field-group">
+                  <label class="field-label">Submission Date</label>
+                  <input type="date" class="field-input" [(ngModel)]="newAppDate" />
+                </div>
+                <button class="btn-primary" (click)="submitApplication()">Submit</button>
+              </div>
+              @if (appMsg) {
+                <div class="alert" [class.alert--success]="!appErr" [class.alert--error]="appErr">
+                  {{ appMsg }}
+                </div>
+              }
+            </div>
+          }
+
+          @if (appsError) {
+            <div class="alert alert--error">⚠️ {{ appsError }}</div>
+          }
+
+          @if (appsLoading) {
+            <div class="loading-state">Loading applications…</div>
+          } @else {
+            <div class="card table-card">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>App ID</th>
+                    <th>User ID</th>
+                    <th>Submission Date</th>
+                    <th>Status</th>
+                    <th>Created At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (app of applications; track app.application_id) {
+                    <tr>
+                      <td class="td-mono">#{{ app.application_id }}</td>
+                      <td>User {{ app.user_id }}</td>
+                      <td>{{ app.submission_date | date:'mediumDate' }}</td>
+                      <td><span class="badge" [ngClass]="badgeClass(app.status)">{{ app.status }}</span></td>
+                      <td class="td-muted">{{ app.created_at | date:'short' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="5" class="table-empty">
+                        No applications found. Connect the backend or submit one above.
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ─── PAYMENTS ──────────────────────────────────────────────── -->
+      @if (activeNav === 'payments') {
+        <div class="section">
+          <div class="section__header">
+            <div>
+              <h1 class="section__title">Payments</h1>
+              <p class="section__subtitle">Record and track resident rent payments.</p>
+            </div>
           </div>
-          <div class="occupancy-bar">
-            <div class="occupancy-bar__fill" style="width: 81%"></div>
+
+          <div class="two-col">
+            <!-- Payment form -->
+            <div class="card form-card">
+              <h3 class="form-card__title">💳 Record Payment</h3>
+              <div class="field-group">
+                <label class="field-label">Month</label>
+                <select class="field-input" [(ngModel)]="paymentMonth">
+                  <option value="" disabled>Select month…</option>
+                  @for (m of months; track m) {
+                    <option [value]="m">{{ m }}</option>
+                  }
+                </select>
+              </div>
+              <div class="field-group" style="margin-top:0.85rem">
+                <label class="field-label">Amount (₱)</label>
+                <input type="number" class="field-input" placeholder="e.g. 5000"
+                       [(ngModel)]="paymentAmount" min="1" />
+              </div>
+              <button class="btn-primary btn-full" style="margin-top:1.1rem"
+                      (click)="recordPayment()" [disabled]="paymentLoading">
+                @if (paymentLoading) { <span class="spinner"></span> Recording… }
+                @else { Record Payment }
+              </button>
+              @if (paymentMsg) {
+                <div class="alert" [class.alert--success]="!paymentErr" [class.alert--error]="paymentErr"
+                     style="margin-top:0.85rem">
+                  {{ paymentMsg }}
+                </div>
+              }
+            </div>
+
+            <!-- Payment summary -->
+            <div class="card">
+              <div class="card__header">
+                <h3 class="card__title">Summary</h3>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Paid this month</span>
+                <span class="summary-value summary-value--success">₱22,500</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Outstanding</span>
+                <span class="summary-value summary-value--danger">₱45,200</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Overdue residents</span>
+                <span class="summary-value summary-value--warning">13</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Collection rate</span>
+                <span class="summary-value">67%</span>
+              </div>
+            </div>
           </div>
-          <div class="occupancy-legend">
-            <span><span class="dot dot--occupied"></span> Occupied (104)</span>
-            <span><span class="dot dot--vacant"></span> Vacant (24)</span>
+
+          <!-- Recent payments table -->
+          <div class="card table-card" style="margin-top:1.25rem">
+            <div class="card__header">
+              <h3 class="card__title">Payment History</h3>
+            </div>
+            @if (paymentsError) {
+              <div class="alert alert--error" style="margin:1rem">⚠️ {{ paymentsError }}</div>
+            } @else if (paymentsLoading) {
+              <div class="loading-state">Loading payments…</div>
+            } @else {
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Payment ID</th>
+                    <th>User ID</th>
+                    <th>Month</th>
+                    <th>Amount</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (p of payments; track p.payment_id) {
+                    <tr>
+                      <td class="td-mono">#{{ p.payment_id }}</td>
+                      <td>User {{ p.user_id }}</td>
+                      <td>{{ p.month }}</td>
+                      <td class="td-amount">₱{{ p.amount | number:'1.2-2' }}</td>
+                      <td class="td-muted">{{ p.created_at | date:'short' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="5" class="table-empty">No payments recorded yet.</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            }
           </div>
         </div>
+      }
 
-      </div>
-    </div>
-  </div>
-</div>
+      <!-- ─── MAINTENANCE / COMPLAINTS ─────────────────────────────── -->
+      @if (activeNav === 'requests') {
+        <div class="section">
+          <div class="section__header">
+            <div>
+              <h1 class="section__title">Maintenance & Complaints</h1>
+              <p class="section__subtitle">Track and resolve resident complaints and maintenance requests.</p>
+            </div>
+            <button class="btn-primary" (click)="showComplaintForm = !showComplaintForm">
+              {{ showComplaintForm ? '✕ Cancel' : '➕ New Complaint' }}
+            </button>
+          </div>
+
+          @if (showComplaintForm) {
+            <div class="card form-card">
+              <h3 class="form-card__title">Submit New Complaint</h3>
+              <div class="field-group">
+                <label class="field-label">Description</label>
+                <textarea class="field-input field-textarea"
+                          placeholder="Describe the maintenance issue or complaint…"
+                          [(ngModel)]="newComplaint" rows="3"></textarea>
+              </div>
+              <button class="btn-primary" style="margin-top:0.85rem" (click)="submitComplaint()">
+                Submit Complaint
+              </button>
+              @if (complaintMsg) {
+                <div class="alert" [class.alert--success]="!complaintErr" [class.alert--error]="complaintErr"
+                     style="margin-top:0.75rem">
+                  {{ complaintMsg }}
+                </div>
+              }
+            </div>
+          }
+
+          @if (complaintsError) {
+            <div class="alert alert--error">⚠️ {{ complaintsError }}</div>
+          }
+
+          @if (complaintsLoading) {
+            <div class="loading-state">Loading complaints…</div>
+          } @else {
+            <div class="card table-card">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>User ID</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (c of complaints; track c.complaint_id) {
+                    <tr>
+                      <td class="td-mono">#{{ c.complaint_id }}</td>
+                      <td>User {{ c.user_id }}</td>
+                      <td class="td-desc">{{ c.description }}</td>
+                      <td><span class="badge" [ngClass]="badgeClass(c.status)">{{ c.status }}</span></td>
+                      <td class="td-muted">{{ c.created_at | date:'short' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="5" class="table-empty">
+                        No complaints found. Connect the backend or submit one above.
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ─── REPORTS ───────────────────────────────────────────────── -->
+      @if (activeNav === 'reports') {
+        <div class="section">
+          <div class="section__header">
+            <div>
+              <h1 class="section__title">Reports</h1>
+              <p class="section__subtitle">Generate and download dormitory reports.</p>
+            </div>
+          </div>
+
+          <div class="two-col">
+            <!-- Generate card -->
+            <div class="card form-card">
+              <h3 class="form-card__title">📊 Generate Report</h3>
+              <p class="form-card__desc">
+                Creates a full dormitory report including occupancy, payment status, and complaint summaries.
+                The report is saved to the server and can be downloaded later.
+              </p>
+              <div class="report-types">
+                <div class="report-type report-type--active">
+                  <span>📈</span>
+                  <div>
+                    <strong>Full Report</strong>
+                    <p>Occupancy + payments + complaints</p>
+                  </div>
+                </div>
+              </div>
+              <button class="btn-primary btn-full" style="margin-top:1.1rem"
+                      (click)="generateReport()" [disabled]="reportLoading">
+                @if (reportLoading) { <span class="spinner"></span> Generating… }
+                @else { 📊 Generate Report }
+              </button>
+              @if (reportMsg) {
+                <div class="alert" [class.alert--success]="!reportErr" [class.alert--error]="reportErr"
+                     style="margin-top:0.85rem">
+                  {{ reportMsg }}
+                </div>
+              }
+            </div>
+
+            <!-- Info card -->
+            <div class="card">
+              <div class="card__header">
+                <h3 class="card__title">Report Info</h3>
+              </div>
+              <div class="info-list">
+                <div class="info-row">
+                  <span class="info-icon">🏠</span>
+                  <div>
+                    <strong>Occupancy</strong>
+                    <p>Current room usage: 81% (104/128)</p>
+                  </div>
+                </div>
+                <div class="info-row">
+                  <span class="info-icon">💳</span>
+                  <div>
+                    <strong>Payments</strong>
+                    <p>13 pending — ₱45,200 outstanding</p>
+                  </div>
+                </div>
+                <div class="info-row">
+                  <span class="info-icon">🔧</span>
+                  <div>
+                    <strong>Complaints</strong>
+                    <p>7 open requests, 2 urgent</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reports list from DB -->
+          <div class="card table-card" style="margin-top:1.25rem">
+            <div class="card__header">
+              <h3 class="card__title">Report History</h3>
+            </div>
+            @if (reportsError) {
+              <div class="alert alert--error" style="margin:1rem">⚠️ {{ reportsError }}</div>
+            } @else if (reportsLoading) {
+              <div class="loading-state">Loading reports…</div>
+            } @else {
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Report #</th>
+                    <th>Generated By (User ID)</th>
+                    <th>Date & Time</th>
+                    <th>File</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of reports; track r.report_id) {
+                    <tr>
+                      <td class="td-mono">RPT-{{ r.report_id.toString().padStart(3, '0') }}</td>
+                      <td>User {{ r.generated_by }}</td>
+                      <td class="td-muted">{{ r.generation_date | date:'short' }}</td>
+                      <td><a class="link-btn" [href]="r.file_path" target="_blank">📥 Download</a></td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="4" class="table-empty">No reports generated yet.</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- ─── SETTINGS ──────────────────────────────────────────────── -->
+      @if (activeNav === 'settings') {
+        <div class="section">
+          <div class="section__header">
+            <div>
+              <h1 class="section__title">Settings</h1>
+              <p class="section__subtitle">Manage dormitory configuration and preferences.</p>
+            </div>
+          </div>
+
+          @if (settingsMsg) {
+            <div class="alert alert--success">✅ {{ settingsMsg }}</div>
+          }
+
+          <div class="two-col">
+            <!-- General settings -->
+            <div class="card form-card">
+              <h3 class="form-card__title">🏢 General Settings</h3>
+              <div class="field-group">
+                <label class="field-label">Dormitory Name</label>
+                <input type="text" class="field-input" [(ngModel)]="settings.dormName" />
+              </div>
+              <div class="field-group" style="margin-top:0.85rem">
+                <label class="field-label">Address</label>
+                <input type="text" class="field-input" [(ngModel)]="settings.address" />
+              </div>
+              <div class="field-group" style="margin-top:0.85rem">
+                <label class="field-label">Max Capacity</label>
+                <input type="number" class="field-input" [(ngModel)]="settings.maxCapacity" min="1" />
+              </div>
+              <div class="field-group" style="margin-top:0.85rem">
+                <label class="field-label">Contact Email</label>
+                <input type="email" class="field-input" [(ngModel)]="settings.contactEmail" />
+              </div>
+            </div>
+
+            <!-- Notification settings -->
+            <div class="card form-card">
+              <h3 class="form-card__title">🔔 Notifications</h3>
+              <div class="toggle-row">
+                <div>
+                  <strong class="toggle-label">Email Notifications</strong>
+                  <p class="toggle-desc">Send email alerts for important events</p>
+                </div>
+                <label class="toggle">
+                  <input type="checkbox" [(ngModel)]="settings.notifications" />
+                  <span class="toggle__slider"></span>
+                </label>
+              </div>
+              <div class="toggle-row">
+                <div>
+                  <strong class="toggle-label">Payment Reminders</strong>
+                  <p class="toggle-desc">Auto-remind residents before rent is due</p>
+                </div>
+                <label class="toggle">
+                  <input type="checkbox" [(ngModel)]="settings.autoReminders" />
+                  <span class="toggle__slider"></span>
+                </label>
+              </div>
+              <div class="toggle-row">
+                <div>
+                  <strong class="toggle-label">Maintenance Alerts</strong>
+                  <p class="toggle-desc">Notify admin of new maintenance complaints</p>
+                </div>
+                <label class="toggle">
+                  <input type="checkbox" [(ngModel)]="settings.maintenanceAlerts" />
+                  <span class="toggle__slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:1.25rem; display:flex; justify-content:flex-end">
+            <button class="btn-primary" (click)="saveSettings()">💾 Save Settings</button>
+          </div>
+        </div>
+      }
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /layout -->
