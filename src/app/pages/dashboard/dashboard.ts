@@ -21,11 +21,24 @@ interface RecentActivity {
   icon: string;
 }
 
+interface Room {
+  room_id: number;
+  room_number: string;
+  floor: number;
+  type: string;
+  status: 'occupied' | 'vacant' | 'maintenance';
+  resident_id?: number;
+  resident_name?: string;
+}
+
 interface Application {
   application_id: number;
   user_id: number;
+  dormitory_id: number | null;
   submission_date: string;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  assigned_room_id: number | null;
+  assigned_room_number?: string;
   created_at: string;
   user_name?: string;
   user_email?: string;
@@ -41,14 +54,6 @@ interface Complaint {
   user_email?: string;
 }
 
-interface Room {
-  number: string;
-  floor: number;
-  status: 'occupied' | 'vacant' | 'maintenance';
-  resident?: string;
-  type: string;
-}
-
 @Component({
   selector: 'app-dashboard',
   imports: [CommonModule, FormsModule],
@@ -57,72 +62,48 @@ interface Room {
 })
 export class DashboardComponent implements OnInit {
   sidebarOpen = true;
-  activeNav = 'dashboard';
+  activeNav   = 'dashboard';
 
-  stats: StatCard[] = [
-    { label: 'Total Rooms',      value: 128, change: '+4 this month', positive: true,  icon: '🏠', color: 'blue'   },
-    { label: 'Occupied',         value: 104, change: '81% occupancy', positive: true,  icon: '✅', color: 'green'  },
-    { label: 'Vacant',           value: 24,  change: '-4 this month', positive: false, icon: '🔓', color: 'orange' },
-    { label: 'Pending Payments', value: 13,  change: '₱45,200 due',  positive: false, icon: '💳', color: 'red'    },
-    { label: 'Open Requests',    value: 7,   change: '2 urgent',      positive: false, icon: '🔧', color: 'yellow' },
-    { label: 'New Residents',    value: 18,  change: 'This month',    positive: true,  icon: '👥', color: 'purple' },
-  ];
-
-  recentActivity: RecentActivity[] = [
-    { type: 'check-in',  message: 'Juan dela Cruz checked into Room 204',     time: '5 min ago',  icon: '🏠' },
-    { type: 'payment',   message: 'Maria Santos paid ₱5,000 for March',       time: '22 min ago', icon: '💳' },
-    { type: 'request',   message: 'Room 108 reported a leaking faucet',       time: '1 hr ago',   icon: '🔧' },
-    { type: 'checkout',  message: 'Pedro Reyes checked out of Room 312',      time: '3 hrs ago',  icon: '📤' },
-    { type: 'notice',    message: 'Curfew reminder sent to all residents',    time: '5 hrs ago',  icon: '🔔' },
-    { type: 'payment',   message: 'Liza Gomez payment overdue — Room 215',    time: 'Yesterday',  icon: '⚠️' },
-  ];
+  // Admin identity
+  adminName     = 'Admin';
+  adminInitials = 'A';
+  today         = new Date();
 
   navItems = [
-    { id: 'dashboard', label: 'Dashboard',   icon: '📊' },
-    { id: 'rooms',     label: 'Rooms',       icon: '🏠' },
-    { id: 'residents', label: 'Residents',   icon: '👥' },
-    { id: 'payments',  label: 'Payments',    icon: '💳' },
-    { id: 'requests',  label: 'Maintenance', icon: '🔧' },
-    { id: 'reports',   label: 'Reports',     icon: '📈' },
-    { id: 'settings',  label: 'Settings',    icon: '⚙️' },
+    { id: 'dashboard', label: 'Dashboard',   icon: 'chart-bar.svg'    },
+    { id: 'rooms',     label: 'Rooms',        icon: 'home.svg'          },
+    { id: 'residents', label: 'Residents',    icon: 'users.svg'         },
+    { id: 'payments',  label: 'Payments',     icon: 'credit-card.svg'   },
+    { id: 'requests',  label: 'Maintenance',  icon: 'wrench.svg'        },
+    { id: 'reports',   label: 'Reports',      icon: 'trending-up.svg'   },
+    { id: 'settings',  label: 'Settings',     icon: 'cog.svg'           },
   ];
 
-  // ── Rooms (static demo data) ─────────────────────────────────────
-  rooms: Room[] = [
-    { number: '101', floor: 1, status: 'occupied',    resident: 'Juan dela Cruz',  type: 'Single' },
-    { number: '102', floor: 1, status: 'occupied',    resident: 'Maria Santos',    type: 'Double' },
-    { number: '103', floor: 1, status: 'vacant',                                   type: 'Single' },
-    { number: '104', floor: 1, status: 'occupied',    resident: 'Pedro Reyes',     type: 'Double' },
-    { number: '105', floor: 1, status: 'occupied',    resident: 'Ana Liza',        type: 'Single' },
-    { number: '106', floor: 1, status: 'occupied',    resident: 'Carlos Mendoza',  type: 'Double' },
-    { number: '107', floor: 1, status: 'maintenance',                              type: 'Single' },
-    { number: '108', floor: 1, status: 'occupied',    resident: 'Rosa Aquino',     type: 'Double' },
-    { number: '201', floor: 2, status: 'occupied',    resident: 'Jose Garcia',     type: 'Single' },
-    { number: '202', floor: 2, status: 'occupied',    resident: 'Elena Bautista',  type: 'Double' },
-    { number: '203', floor: 2, status: 'occupied',    resident: 'Marco Rivera',    type: 'Single' },
-    { number: '204', floor: 2, status: 'occupied',    resident: 'Liza Gomez',      type: 'Double' },
-    { number: '205', floor: 2, status: 'vacant',                                   type: 'Single' },
-    { number: '206', floor: 2, status: 'occupied',    resident: 'Andres Torres',   type: 'Double' },
-    { number: '207', floor: 2, status: 'occupied',    resident: 'Celine Cruz',     type: 'Single' },
-    { number: '208', floor: 2, status: 'occupied',    resident: 'Rico Santos',     type: 'Double' },
-    { number: '301', floor: 3, status: 'occupied',    resident: 'Diana Lee',       type: 'Single' },
-    { number: '302', floor: 3, status: 'occupied',    resident: 'Frank Tan',       type: 'Double' },
-    { number: '303', floor: 3, status: 'vacant',                                   type: 'Suite'  },
-    { number: '304', floor: 3, status: 'occupied',    resident: 'Grace Kim',       type: 'Single' },
-    { number: '305', floor: 3, status: 'occupied',    resident: 'Henry Sy',        type: 'Double' },
-    { number: '306', floor: 3, status: 'occupied',    resident: 'Iris Chan',       type: 'Suite'  },
-    { number: '307', floor: 3, status: 'occupied',    resident: 'James Lim',       type: 'Single' },
-    { number: '308', floor: 3, status: 'maintenance',                              type: 'Double' },
-    { number: '401', floor: 4, status: 'occupied',    resident: 'Karen Wong',      type: 'Single' },
-    { number: '402', floor: 4, status: 'occupied',    resident: 'Luis Tan',        type: 'Double' },
-    { number: '403', floor: 4, status: 'vacant',                                   type: 'Single' },
-    { number: '404', floor: 4, status: 'occupied',    resident: 'Mia Reyes',       type: 'Suite'  },
-    { number: '405', floor: 4, status: 'occupied',    resident: 'Nina Cruz',       type: 'Single' },
-    { number: '406', floor: 4, status: 'occupied',    resident: 'Oscar Santos',    type: 'Double' },
-    { number: '407', floor: 4, status: 'vacant',                                   type: 'Single' },
-    { number: '408', floor: 4, status: 'occupied',    resident: 'Paula Garcia',    type: 'Suite'  },
+  // ── Stats (loaded from API) ───────────────────────────────────────
+  stats: StatCard[] = [
+    { label: 'Total Rooms',   value: '—', change: 'Loading…',      positive: true,  icon: 'home.svg',          color: 'blue'   },
+    { label: 'Occupied',      value: '—', change: 'Loading…',      positive: true,  icon: 'check-circle.svg',  color: 'green'  },
+    { label: 'Vacant',        value: '—', change: 'Loading…',      positive: false, icon: 'lock-open.svg',     color: 'orange' },
+    { label: 'Pending Apps',  value: '—', change: 'Loading…',      positive: false, icon: 'credit-card.svg',   color: 'red'    },
+    { label: 'Open Requests', value: '—', change: 'Loading…',      positive: false, icon: 'wrench.svg',        color: 'yellow' },
+    { label: 'Total Students',value: '—', change: 'Loading…',      positive: true,  icon: 'users.svg',         color: 'purple' },
   ];
 
+  // Raw stats for occupancy bar
+  dormStats: any = {};
+
+  get occupancyPct(): number {
+    if (!this.dormStats.totalRooms) return 0;
+    return Math.round((this.dormStats.occupiedRooms ?? 0) / this.dormStats.totalRooms * 100);
+  }
+
+  // ── Activity (loaded from API) ────────────────────────────────────
+  recentActivity: RecentActivity[] = [];
+
+  // ── Rooms (loaded from API) ───────────────────────────────────────
+  rooms: Room[] = [];
+  roomsLoading  = false;
+  roomsError    = '';
   roomFilter: 'all' | 'occupied' | 'vacant' | 'maintenance' = 'all';
 
   get filteredRooms(): Room[] {
@@ -131,94 +112,93 @@ export class DashboardComponent implements OnInit {
   }
 
   get floors(): number[] {
-    return [...new Set(this.filteredRooms.map(r => r.floor))];
+    return [...new Set(this.filteredRooms.map(r => r.floor))].sort();
   }
 
   roomsOnFloor(floor: number): Room[] {
     return this.filteredRooms.filter(r => r.floor === floor);
   }
 
-  get occupiedCount(): number    { return this.rooms.filter(r => r.status === 'occupied').length; }
-  get vacantCount(): number      { return this.rooms.filter(r => r.status === 'vacant').length; }
+  get occupiedCount():    number { return this.rooms.filter(r => r.status === 'occupied').length;    }
+  get vacantCount():      number { return this.rooms.filter(r => r.status === 'vacant').length;      }
   get maintenanceCount(): number { return this.rooms.filter(r => r.status === 'maintenance').length; }
 
-  // ── Applications / Residents ──────────────────────────────────────
-  applications: Application[] = [];
-  appsLoading = false;
-  appsError = '';
-  showAppForm = false;
-  newAppDate = '';
-  appMsg = '';
-  appErr = false;
+  // ── Application / Residents ───────────────────────────────────────
+  applications:   Application[] = [];
+  appsLoading     = false;
+  appsError       = '';
+  showAppForm     = false;
+  newAppDate      = '';
+  appMsg          = '';
+  appErr          = false;
+
+  // Room assignment when accepting
+  acceptingAppId  = 0;
+  selectedRoomId  = 0;
+  vacantRooms:    any[] = [];
 
   // ── Complaints / Maintenance ──────────────────────────────────────
-  complaints: Complaint[] = [];
-  complaintsLoading = false;
-  complaintsError = '';
-  showComplaintForm = false;
-  newComplaint = '';
-  complaintMsg = '';
-  complaintErr = false;
+  complaints:        Complaint[] = [];
+  complaintsLoading  = false;
+  complaintsError    = '';
+  showComplaintForm  = false;
+  newComplaint       = '';
+  complaintMsg       = '';
+  complaintErr       = false;
 
   // ── Payments ──────────────────────────────────────────────────────
-  months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  paymentMonth = '';
+  months         = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  paymentMonth   = '';
   paymentAmount: number | null = null;
-  paymentMsg = '';
-  paymentErr = false;
+  paymentMsg     = '';
+  paymentErr     = false;
   paymentLoading = false;
-  payments: any[] = [];
+  payments:       any[] = [];
   paymentsLoading = false;
-  paymentsError = '';
+  paymentsError   = '';
 
   // ── Reports ───────────────────────────────────────────────────────
-  reportMsg = '';
-  reportErr = false;
+  reportMsg     = '';
+  reportErr     = false;
   reportLoading = false;
-  reports: any[] = [];
-  reportsLoading = false;
-  reportsError = '';
+  reports:        any[] = [];
+  reportsLoading  = false;
+  reportsError    = '';
 
-  // ── Settings ──────────────────────────────────────────────────────
-  settingsMsg = '';
-  settings = {
-    dormName: 'DormMS Student Residence',
-    address: '123 University Ave, Manila',
-    maxCapacity: 128,
-    contactEmail: 'admin@dorms.edu',
-    notifications: true,
-    autoReminders: true,
-    maintenanceAlerts: true,
+  // ── Admin Profile (Settings) ──────────────────────────────────────
+  adminProfile = {
+    name:           '',
+    email:          '',
+    position:       '',
+    phone:          '',
+    dormitory_name: '',
+    address:        '',
+    contact_email:  '',
+    contact_phone:  '',
+    max_capacity:   0,
   };
+  adminProfileLoading = false;
+  adminProfileMsg     = '';
+  adminProfileErr     = false;
+  // Keep notification toggles local (no DB storage needed)
+  notifSettings = { notifications: true, autoReminders: true, maintenanceAlerts: true };
 
   constructor(private router: Router, private api: ApiService, private auth: AuthService) {}
 
   ngOnInit(): void {
-    this.loadAdminStats();
-  }
+    const name = this.auth.getName() ?? 'Admin';
+    this.adminName     = name;
+    this.adminInitials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 
-  // ── Admin stats ───────────────────────────────────────────────────
-  loadAdminStats(): void {
-    this.api.getStats().subscribe({
-      next: (data) => {
-        // Occupied ← active contracts; Vacant ← remainder of 128
-        this.stats[1].value  = data.activeContracts;
-        this.stats[1].change = `${Math.round(data.activeContracts / 128 * 100)}% occupancy`;
-        this.stats[2].value  = 128 - data.activeContracts;
-        this.stats[2].change = `${128 - data.activeContracts} available`;
-        // Pending applications (was "Pending Payments")
-        this.stats[3].label  = 'Pending Apps';
-        this.stats[3].value  = data.pendingApplications;
-        this.stats[3].change = data.pendingApplications > 0 ? 'Awaiting review' : 'All reviewed';
-        // Open complaints
-        this.stats[4].value  = data.openComplaints;
-        this.stats[4].change = `${data.openComplaints} unresolved`;
-        // Total students
-        this.stats[5].value  = data.totalStudents;
-        this.stats[5].change = 'Registered students';
-      },
-      error: () => {} // keep static fallback values on error
-    });
+    // Load everything on init so data is ready when user navigates
+    this.loadAdminStats();
+    this.loadRooms();
+    this.loadActivity();
+    this.loadApplications();
+    this.loadComplaints();
+    this.loadPayments();
+    this.loadReports();
+    this.loadAdminProfile();
   }
 
   get pageName(): string {
@@ -227,26 +207,26 @@ export class DashboardComponent implements OnInit {
 
   setActive(id: string): void {
     this.activeNav = id;
-    if (id === 'residents') this.loadApplications();
-    if (id === 'requests')  this.loadComplaints();
-    if (id === 'payments')  this.loadPayments();
-    if (id === 'reports')   this.loadReports();
+    // Always reload the section's data on navigation
+    if (id === 'dashboard') { this.loadAdminStats(); this.loadActivity(); }
+    if (id === 'rooms')      this.loadRooms();
+    if (id === 'residents')  this.loadApplications();
+    if (id === 'payments')   this.loadPayments();
+    if (id === 'requests')   this.loadComplaints();
+    if (id === 'reports')    this.loadReports();
+    if (id === 'settings')   this.loadAdminProfile();
   }
 
-  toggleSidebar(): void {
-    this.sidebarOpen = !this.sidebarOpen;
-  }
+  toggleSidebar(): void { this.sidebarOpen = !this.sidebarOpen; }
 
   logout(): void {
     this.auth.logout();
     this.router.navigate(['/login']);
   }
 
-  navigateTo(section: string): void {
-    this.setActive(section);
-  }
+  navigateTo(section: string): void { this.setActive(section); }
 
-  // ── Status helpers ────────────────────────────────────────────────
+  // ── Status badge helper ───────────────────────────────────────────
   badgeClass(status: string): string {
     const map: Record<string, string> = {
       PENDING:     'badge--warning',
@@ -262,26 +242,78 @@ export class DashboardComponent implements OnInit {
     return map[status] ?? 'badge--default';
   }
 
-  // ── Applications ──────────────────────────────────────────────────
-  updateApplicationStatus(appId: number, status: 'ACCEPTED' | 'REJECTED'): void {
-    this.api.updateApplicationStatus(appId, status).subscribe({
-      next: () => {
-        this.appMsg = `Application #${appId} ${status.toLowerCase()}.`;
-        this.appErr = false;
-        this.loadApplications();
-        this.loadAdminStats();
+  // ── Stats ─────────────────────────────────────────────────────────
+  loadAdminStats(): void {
+    this.api.getStats().subscribe({
+      next: (data: any) => {
+        this.dormStats = data;
+        this.stats[0].value  = data.totalRooms;
+        this.stats[0].change = `${data.occupiedRooms} occupied, ${data.vacantRooms} vacant`;
+        this.stats[1].value  = data.occupiedRooms;
+        this.stats[1].change = `${this.occupancyPct}% occupancy`;
+        this.stats[2].value  = data.vacantRooms;
+        this.stats[2].change = `${data.maintenanceRooms} under maintenance`;
+        this.stats[3].value  = data.pendingApplications;
+        this.stats[3].change = data.pendingApplications > 0 ? 'Awaiting review' : 'All reviewed';
+        this.stats[4].value  = data.openComplaints;
+        this.stats[4].change = `${data.openComplaints} unresolved`;
+        this.stats[5].value  = data.totalStudents;
+        this.stats[5].change = 'Registered students';
       },
-      error: () => { this.appMsg = 'Failed to update status.'; this.appErr = true; },
+      error: () => {}
     });
   }
 
+  // ── Activity ──────────────────────────────────────────────────────
+  loadActivity(): void {
+    this.api.getActivity().subscribe({
+      next: (data: any[]) => {
+        this.recentActivity = data.map(item => {
+          if (item.type === 'application') {
+            return { type: 'application', message: `${item.actor} — application ${item.detail.toLowerCase()}`, time: this.timeAgo(item.created_at), icon: 'clipboard-list.svg' };
+          } else if (item.type === 'complaint') {
+            return { type: 'complaint', message: `${item.actor} — complaint ${item.detail.replace('_', ' ').toLowerCase()}`, time: this.timeAgo(item.created_at), icon: 'wrench.svg' };
+          } else {
+            return { type: 'payment', message: `${item.actor} — payment for ${item.detail}`, time: this.timeAgo(item.created_at), icon: 'credit-card.svg' };
+          }
+        });
+      },
+      error: () => {}
+    });
+  }
+
+  timeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1)   return 'Just now';
+    if (mins < 60)  return `${mins} min ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24)   return `${hrs} hr ago`;
+    const days = Math.floor(hrs / 24);
+    return days === 1 ? 'Yesterday' : `${days} days ago`;
+  }
+
+  // ── Rooms ─────────────────────────────────────────────────────────
+  loadRooms(): void {
+    this.roomsLoading = true;
+    this.roomsError   = '';
+    this.api.getRooms().subscribe({
+      next: (data) => { this.rooms = data; this.roomsLoading = false; },
+      error: () => {
+        this.roomsError   = 'Could not load rooms. Make sure the backend server is running.';
+        this.roomsLoading = false;
+      },
+    });
+  }
+
+  // ── Applications ──────────────────────────────────────────────────
   loadApplications(): void {
     this.appsLoading = true;
-    this.appsError = '';
+    this.appsError   = '';
     this.api.getApplications().subscribe({
       next: (data) => { this.applications = data; this.appsLoading = false; },
       error: () => {
-        this.appsError = 'Could not load applications. Make sure the backend server is running on port 3000.';
+        this.appsError   = 'Could not load applications. Make sure the backend server is running on port 3000.';
         this.appsLoading = false;
       },
     });
@@ -301,6 +333,56 @@ export class DashboardComponent implements OnInit {
     });
   }
 
+  // Start accept flow: load vacant rooms and flag this app
+  startAcceptApplication(appId: number): void {
+    this.acceptingAppId = appId;
+    this.selectedRoomId = 0;
+    this.api.getVacantRooms().subscribe({
+      next: (data) => { this.vacantRooms = data; },
+      error: () => { this.vacantRooms = []; },
+    });
+  }
+
+  cancelAccept(): void {
+    this.acceptingAppId = 0;
+    this.selectedRoomId = 0;
+  }
+
+  confirmAcceptApplication(appId: number): void {
+    if (!this.selectedRoomId) {
+      this.appMsg = 'Please select a room before confirming.';
+      this.appErr = true;
+      return;
+    }
+    this.api.updateApplicationStatus(appId, 'ACCEPTED', this.selectedRoomId).subscribe({
+      next: () => {
+        this.appMsg = `Application #${appId} accepted and room assigned.`;
+        this.appErr = false;
+        this.acceptingAppId = 0;
+        this.selectedRoomId = 0;
+        this.loadApplications();
+        this.loadAdminStats();
+        this.loadRooms();
+      },
+      error: (err: any) => {
+        this.appMsg = err?.error?.message ?? 'Failed to accept application.';
+        this.appErr = true;
+      },
+    });
+  }
+
+  rejectApplication(appId: number): void {
+    this.api.updateApplicationStatus(appId, 'REJECTED').subscribe({
+      next: () => {
+        this.appMsg = `Application #${appId} rejected.`;
+        this.appErr = false;
+        this.loadApplications();
+        this.loadAdminStats();
+      },
+      error: () => { this.appMsg = 'Failed to reject application.'; this.appErr = true; },
+    });
+  }
+
   // ── Complaints ────────────────────────────────────────────────────
   updateComplaintStatus(id: number, status: 'IN_PROGRESS' | 'RESOLVED'): void {
     this.api.updateComplaintStatus(id, status).subscribe({
@@ -316,11 +398,11 @@ export class DashboardComponent implements OnInit {
 
   loadComplaints(): void {
     this.complaintsLoading = true;
-    this.complaintsError = '';
+    this.complaintsError   = '';
     this.api.getComplaints().subscribe({
       next: (data) => { this.complaints = data; this.complaintsLoading = false; },
       error: () => {
-        this.complaintsError = 'Could not load complaints. Make sure the backend server is running on port 3000.';
+        this.complaintsError   = 'Could not load complaints. Make sure the backend server is running on port 3000.';
         this.complaintsLoading = false;
       },
     });
@@ -343,11 +425,11 @@ export class DashboardComponent implements OnInit {
   // ── Payments ──────────────────────────────────────────────────────
   loadPayments(): void {
     this.paymentsLoading = true;
-    this.paymentsError = '';
+    this.paymentsError   = '';
     this.api.getPayments().subscribe({
       next: (data) => { this.payments = data; this.paymentsLoading = false; },
       error: () => {
-        this.paymentsError = 'Could not load payments. Make sure the backend server is running on port 3000.';
+        this.paymentsError   = 'Could not load payments. Make sure the backend server is running on port 3000.';
         this.paymentsLoading = false;
       },
     });
@@ -363,16 +445,16 @@ export class DashboardComponent implements OnInit {
     this.api.recordPayment(this.paymentMonth, this.paymentAmount).subscribe({
       next: () => {
         const amt = this.paymentAmount?.toLocaleString();
-        this.paymentMsg = `Payment of ₱${amt} for ${this.paymentMonth} recorded successfully!`;
-        this.paymentErr = false;
-        this.paymentMonth = '';
-        this.paymentAmount = null;
+        this.paymentMsg     = `Payment of ₱${amt} for ${this.paymentMonth} recorded!`;
+        this.paymentErr     = false;
+        this.paymentMonth   = '';
+        this.paymentAmount  = null;
         this.paymentLoading = false;
         this.loadPayments();
       },
       error: () => {
-        this.paymentMsg = 'Failed to record payment. Please try again.';
-        this.paymentErr = true;
+        this.paymentMsg     = 'Failed to record payment. Please try again.';
+        this.paymentErr     = true;
         this.paymentLoading = false;
       },
     });
@@ -381,11 +463,11 @@ export class DashboardComponent implements OnInit {
   // ── Reports ───────────────────────────────────────────────────────
   loadReports(): void {
     this.reportsLoading = true;
-    this.reportsError = '';
+    this.reportsError   = '';
     this.api.getReports().subscribe({
       next: (data) => { this.reports = data; this.reportsLoading = false; },
       error: () => {
-        this.reportsError = 'Could not load reports. Make sure the backend server is running on port 3000.';
+        this.reportsError   = 'Could not load reports. Make sure the backend server is running on port 3000.';
         this.reportsLoading = false;
       },
     });
@@ -395,22 +477,59 @@ export class DashboardComponent implements OnInit {
     this.reportLoading = true;
     this.api.generateReport().subscribe({
       next: () => {
-        this.reportMsg = 'Report generated and saved successfully!';
-        this.reportErr = false;
+        this.reportMsg     = 'Report generated and saved successfully!';
+        this.reportErr     = false;
         this.reportLoading = false;
         this.loadReports();
       },
       error: () => {
-        this.reportMsg = 'Failed to generate report. Please try again.';
-        this.reportErr = true;
+        this.reportMsg     = 'Failed to generate report. Please try again.';
+        this.reportErr     = true;
         this.reportLoading = false;
       },
     });
   }
 
-  // ── Settings ──────────────────────────────────────────────────────
-  saveSettings(): void {
-    this.settingsMsg = 'Settings saved successfully!';
-    setTimeout(() => (this.settingsMsg = ''), 3000);
+  // ── Admin Profile (Settings) ──────────────────────────────────────
+  loadAdminProfile(): void {
+    this.adminProfileLoading = true;
+    this.api.getAdminProfile().subscribe({
+      next: (data) => {
+        this.adminProfile.name           = data.name           ?? '';
+        this.adminProfile.email          = data.email          ?? '';
+        this.adminProfile.position       = data.position       ?? 'Dormitory Administrator';
+        this.adminProfile.phone          = data.phone          ?? '';
+        this.adminProfile.dormitory_name = data.dormitory_name ?? '';
+        this.adminProfile.address        = data.address        ?? '';
+        this.adminProfile.contact_email  = data.contact_email  ?? '';
+        this.adminProfile.contact_phone  = data.contact_phone  ?? '';
+        this.adminProfile.max_capacity   = data.max_capacity   ?? 0;
+        this.adminProfileLoading         = false;
+
+        // Update displayed admin name in topbar
+        if (data.name) {
+          this.adminName     = data.name;
+          this.adminInitials = data.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
+        }
+      },
+      error: () => { this.adminProfileLoading = false; },
+    });
+  }
+
+  saveAdminProfile(): void {
+    this.api.updateAdminProfile(this.adminProfile).subscribe({
+      next: () => {
+        this.adminProfileMsg = 'Profile saved successfully!';
+        this.adminProfileErr = false;
+        // Update topbar name
+        this.adminName     = this.adminProfile.name;
+        this.adminInitials = this.adminProfile.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        setTimeout(() => (this.adminProfileMsg = ''), 3000);
+      },
+      error: (err: any) => {
+        this.adminProfileMsg = err?.error?.message ?? 'Failed to save profile.';
+        this.adminProfileErr = true;
+      },
+    });
   }
 }

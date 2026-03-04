@@ -9,32 +9,32 @@ import { Router } from '@angular/router';
 export class HomeComponent {
   features = [
     {
-      icon: '🏠',
+      icon: 'home.svg',
       title: 'Room Management',
       desc: 'Assign, transfer, and track dormitory rooms with real-time availability.',
     },
     {
-      icon: '👥',
+      icon: 'users.svg',
       title: 'Resident Profiles',
       desc: 'Maintain complete resident records including contracts and emergency contacts.',
     },
     {
-      icon: '💳',
+      icon: 'credit-card.svg',
       title: 'Billing & Payments',
       desc: 'Automate invoices, track payments, and manage outstanding balances effortlessly.',
     },
     {
-      icon: '🔧',
+      icon: 'wrench.svg',
       title: 'Maintenance Requests',
       desc: 'Log, assign, and resolve maintenance tickets to keep facilities running.',
     },
     {
-      icon: '📊',
+      icon: 'chart-bar.svg',
       title: 'Reports & Analytics',
       desc: 'Generate occupancy, financial, and operational reports at a glance.',
     },
     {
-      icon: '🔔',
+      icon: 'bell.svg',
       title: 'Announcements',
       desc: 'Broadcast important notices to residents and staff instantly.',
     },

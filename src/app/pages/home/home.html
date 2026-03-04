@@ -1,7 +1,7 @@
 <!-- NAVBAR -->
 <nav class="navbar">
   <div class="navbar__brand">
-    <span class="navbar__icon">🏢</span>
+    <img src="icons/building-office.svg" class="icon icon--brand" alt="DormMS">
     <span class="navbar__name">DormMS</span>
   </div>
   <ul class="navbar__links">
@@ -53,7 +53,9 @@
   <div class="features__grid">
     @for (f of features; track f.title) {
       <div class="feature-card">
-        <div class="feature-card__icon">{{ f.icon }}</div>
+        <div class="feature-card__icon">
+          <img [src]="'icons/' + f.icon" class="icon icon--feature" [alt]="f.title">
+        </div>
         <h3 class="feature-card__title">{{ f.title }}</h3>
         <p class="feature-card__desc">{{ f.desc }}</p>
       </div>
@@ -71,7 +73,7 @@
 <!-- FOOTER -->
 <footer class="footer">
   <div class="footer__brand">
-    <span>🏢</span> DormMS &copy; 2025
+    <img src="icons/building-office.svg" class="icon" alt="DormMS"> DormMS &copy; 2025
   </div>
   <p class="footer__note">Dormitory Management System — Built for efficiency.</p>
 </footer>

@@ -3,7 +3,9 @@
   <!-- ═══ SIDEBAR ════════════════════════════════════════════════════ -->
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <span class="sidebar__brand-icon">🏢</span>
+      <span class="sidebar__brand-icon">
+        <img src="icons/building-office.svg" class="icon" alt="DormMS">
+      </span>
       @if (sidebarOpen) {
         <span class="sidebar__brand-name">DormMS</span>
       }
@@ -16,7 +18,9 @@
           [class.sidebar__nav-item--active]="activeNav === item.id"
           (click)="setActive(item.id)"
         >
-          <span class="sidebar__nav-icon">{{ item.icon }}</span>
+          <span class="sidebar__nav-icon">
+            <img [src]="'icons/' + item.icon" class="icon" [alt]="item.label">
+          </span>
           @if (sidebarOpen) {
             <span class="sidebar__nav-label">{{ item.label }}</span>
           }
@@ -25,7 +29,7 @@
     </nav>
 
     <button class="sidebar__logout" (click)="logout()">
-      <span>🚪</span>
+      <img src="icons/logout.svg" class="icon" alt="logout">
       @if (sidebarOpen) { <span>Logout</span> }
     </button>
   </aside>
@@ -37,12 +41,14 @@
     <header class="topbar">
       <div class="topbar__left">
         <button class="topbar__toggle" (click)="toggleSidebar()">
-          {{ sidebarOpen ? '◀' : '▶' }}
+          <img [src]="sidebarOpen ? 'icons/chevron-left.svg' : 'icons/chevron-right.svg'" class="icon" alt="toggle sidebar">
         </button>
         <span class="topbar__page">{{ pageName }}</span>
       </div>
       <div class="topbar__right">
-        <button class="topbar__icon-btn" title="Notifications">🔔</button>
+        <button class="topbar__icon-btn" title="Notifications">
+          <img src="icons/bell.svg" class="icon" alt="notifications">
+        </button>
         <div class="topbar__avatar"><span>{{ student.initials }}</span></div>
         <div class="topbar__user">
           <span class="topbar__user-name">{{ student.name }}</span>
@@ -58,10 +64,16 @@
       @if (activeNav === 'overview') {
         <div class="content__welcome">
           <div>
-            <h1 class="content__title">Good morning, {{ student.name.split(' ')[0] }} 👋</h1>
-            <p class="content__subtitle">Here's an overview of your dormitory status.</p>
+            <h1 class="content__title">
+              Good morning, {{ student.name.split(' ')[0] }}
+              <img src="icons/hand-raised.svg" class="icon icon--wave" alt="wave">
+            </h1>
+            <p class="content__subtitle">
+            Here's an overview of your status
+            @if (student.dormitoryName) { at <strong>{{ student.dormitoryName }}</strong> }.
+          </p>
           </div>
-          <span class="content__date">March 1, 2026</span>
+          <span class="content__date">{{ today | date:'MMMM d, y' }}</span>
         </div>
 
         <!-- Stat cards -->
@@ -69,14 +81,18 @@
           @for (stat of stats; track stat.label) {
             <div class="stat-card stat-card--{{ stat.color }}">
               <div class="stat-card__top">
-                <span class="stat-card__icon">{{ stat.icon }}</span>
+                <span class="stat-card__icon">
+                  <img [src]="'icons/' + stat.icon" class="icon" [alt]="stat.label">
+                </span>
                 <span class="stat-card__label">{{ stat.label }}</span>
               </div>
               <div class="stat-card__value">{{ stat.value }}</div>
               <div class="stat-card__change"
                    [class.stat-card__change--positive]="stat.positive"
                    [class.stat-card__change--negative]="!stat.positive">
-                {{ stat.positive ? '▲' : '▼' }} {{ stat.change }}
+                <img [src]="stat.positive ? 'icons/arrow-trending-up.svg' : 'icons/arrow-trending-down.svg'"
+                     class="icon icon--xs" [alt]="stat.positive ? 'up' : 'down'">
+                {{ stat.change }}
               </div>
             </div>
           }
@@ -85,7 +101,9 @@
         <!-- Payment due banner -->
         <div class="due-banner">
           <div class="due-banner__left">
-            <span class="due-banner__icon">⏰</span>
+            <span class="due-banner__icon">
+              <img src="icons/clock.svg" class="icon icon--banner" alt="due date">
+            </span>
             <div>
               <strong>Rent due in {{ nextPayment.daysLeft }} days</strong>
               <p>₱{{ nextPayment.amount | number }} for {{ nextPayment.month }} — due {{ nextPayment.dueDate }}</p>
@@ -103,7 +121,9 @@
             <ul class="activity-list">
               @for (item of recentActivity; track item.message) {
                 <li class="activity-item">
-                  <span class="activity-item__icon">{{ item.icon }}</span>
+                  <span class="activity-item__icon">
+                    <img [src]="'icons/' + item.icon" class="icon" alt="activity">
+                  </span>
                   <div class="activity-item__info">
                     <p class="activity-item__msg">{{ item.message }}</p>
                     <span class="activity-item__time">{{ item.time }}</span>
@@ -121,22 +141,22 @@
               </div>
               <div class="quick-actions">
                 <button class="quick-btn quick-btn--blue"   (click)="navigateTo('apply')">
-                  <span>🏠</span> Apply
+                  <img src="icons/home.svg" class="icon" alt="apply"> Apply
                 </button>
                 <button class="quick-btn quick-btn--orange" (click)="navigateTo('payments')">
-                  <span>💳</span> Pay Rent
+                  <img src="icons/credit-card.svg" class="icon" alt="pay rent"> Pay Rent
                 </button>
                 <button class="quick-btn quick-btn--red"    (click)="navigateTo('complaints')">
-                  <span>🔧</span> Complaint
+                  <img src="icons/wrench.svg" class="icon" alt="complaint"> Complaint
                 </button>
                 <button class="quick-btn quick-btn--green"  (click)="navigateTo('contract')">
-                  <span>📋</span> Contract
+                  <img src="icons/clipboard-list.svg" class="icon" alt="contract"> Contract
                 </button>
                 <button class="quick-btn quick-btn--purple" (click)="navigateTo('documents')">
-                  <span>📄</span> Documents
+                  <img src="icons/document.svg" class="icon" alt="documents"> Documents
                 </button>
                 <button class="quick-btn quick-btn--teal"   (click)="navigateTo('profile')">
-                  <span>👤</span> Profile
+                  <img src="icons/user.svg" class="icon" alt="profile"> Profile
                 </button>
               </div>
             </div>
@@ -148,7 +168,7 @@
               <div class="contact-list">
                 @for (c of importantContacts; track c.label) {
                   <div class="contact-row">
-                    <span class="contact-icon">{{ c.icon }}</span>
+                    <img [src]="'icons/' + c.icon" class="icon contact-icon" [alt]="c.label">
                     <div>
                       <p class="contact-label">{{ c.label }}</p>
                       <p class="contact-value">{{ c.value }}</p>
@@ -224,14 +244,14 @@
               <h3 class="form-card__title" style="margin-top: 1.75rem">Room Information</h3>
               <div class="info-list">
                 <div class="info-row">
-                  <span class="info-icon">🏠</span>
+                  <img src="icons/home.svg" class="icon info-icon" alt="room">
                   <div>
                     <strong>Room {{ roomInfo.number }}</strong>
                     <p>Floor {{ roomInfo.floor }} · {{ roomInfo.type }} Room</p>
                   </div>
                 </div>
                 <div class="info-row">
-                  <span class="info-icon">📋</span>
+                  <img src="icons/clipboard-list.svg" class="icon info-icon" alt="contract">
                   <div>
                     <strong>Contract Status</strong>
                     <p>
@@ -245,7 +265,9 @@
           </div>
 
           <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end">
-            <button class="btn-primary" (click)="saveProfile()">💾 Save Profile</button>
+            <button class="btn-primary" (click)="saveProfile()">
+              <img src="icons/save.svg" class="icon icon--btn" alt="save"> Save Profile
+            </button>
           </div>
         </div>
       }
@@ -261,7 +283,9 @@
           </div>
 
           @if (docMsg) {
-            <div class="alert alert--success" style="margin-bottom: 1.25rem">✅ {{ docMsg }}</div>
+            <div class="alert alert--success" style="margin-bottom: 1.25rem">
+              <img src="icons/check-circle.svg" class="icon icon--alert" alt="success"> {{ docMsg }}
+            </div>
           }
 
           <!-- Progress -->
@@ -289,7 +313,7 @@
             @for (doc of documents; track doc.name) {
               <div class="doc-card" [class.doc-card--uploaded]="doc.uploaded" [class.doc-card--missing]="!doc.uploaded">
                 <div class="doc-card__top">
-                  <span class="doc-card__icon">{{ doc.icon }}</span>
+                  <img [src]="'icons/' + doc.icon" class="icon icon--doc doc-card__icon" [alt]="doc.name">
                   <div class="doc-card__info">
                     <h4 class="doc-card__name">{{ doc.name }}</h4>
                     <p class="doc-card__meta">
@@ -301,17 +325,23 @@
                 <div class="doc-card__bottom">
                   @if (doc.uploaded) {
                     <div class="doc-status doc-status--ok">
-                      <span>✅</span> Uploaded {{ doc.date }}
+                      <img src="icons/check-circle.svg" class="icon icon--sm" alt="uploaded"> Uploaded {{ doc.date }}
                     </div>
                     <div class="doc-actions">
-                      <button class="link-btn">📥 Download</button>
-                      <button class="link-btn" (click)="simulateUpload(doc)">🔄 Replace</button>
+                      <button class="link-btn">
+                        <img src="icons/download.svg" class="icon icon--sm" alt="download"> Download
+                      </button>
+                      <button class="link-btn" (click)="simulateUpload(doc)">
+                        <img src="icons/arrow-path.svg" class="icon icon--sm" alt="replace"> Replace
+                      </button>
                     </div>
                   } @else {
                     <div class="doc-status doc-status--missing">
-                      <span>⚠️</span> Not uploaded yet
+                      <img src="icons/exclamation-triangle.svg" class="icon icon--sm" alt="missing"> Not uploaded yet
                     </div>
-                    <button class="btn-primary btn-sm" (click)="simulateUpload(doc)">📤 Upload</button>
+                    <button class="btn-primary btn-sm" (click)="simulateUpload(doc)">
+                      <img src="icons/upload.svg" class="icon icon--sm" alt="upload"> Upload
+                    </button>
                   }
                 </div>
               </div>
@@ -340,25 +370,35 @@
 
               <div class="contract-detail-list">
                 <div class="contract-detail-row">
-                  <span class="contract-detail-label">🏠 Room</span>
+                  <span class="contract-detail-label">
+                    <img src="icons/home.svg" class="icon icon--sm" alt="room"> Room
+                  </span>
                   <span class="contract-detail-value">Room {{ roomInfo.number }} — Floor {{ roomInfo.floor }} ({{ roomInfo.type }})</span>
                 </div>
                 <div class="contract-detail-row">
-                  <span class="contract-detail-label">📅 Start Date</span>
+                  <span class="contract-detail-label">
+                    <img src="icons/calendar.svg" class="icon icon--sm" alt="start date"> Start Date
+                  </span>
                   <span class="contract-detail-value">{{ contractInfo.startDate }}</span>
                 </div>
                 <div class="contract-detail-row">
-                  <span class="contract-detail-label">📅 End Date</span>
+                  <span class="contract-detail-label">
+                    <img src="icons/calendar.svg" class="icon icon--sm" alt="end date"> End Date
+                  </span>
                   <span class="contract-detail-value">{{ contractInfo.endDate }}</span>
                 </div>
                 <div class="contract-detail-row">
-                  <span class="contract-detail-label">💳 Monthly Rent</span>
+                  <span class="contract-detail-label">
+                    <img src="icons/credit-card.svg" class="icon icon--sm" alt="rent"> Monthly Rent
+                  </span>
                   <span class="contract-detail-value contract-detail-value--amount">
                     ₱{{ contractInfo.monthlyRent | number }}
                   </span>
                 </div>
                 <div class="contract-detail-row">
-                  <span class="contract-detail-label">📄 Contract ID</span>
+                  <span class="contract-detail-label">
+                    <img src="icons/document.svg" class="icon icon--sm" alt="contract id"> Contract ID
+                  </span>
                   <span class="contract-detail-value td-mono">{{ contractInfo.contractId }}</span>
                 </div>
               </div>
@@ -377,14 +417,18 @@
                     <strong>Download Contract</strong>
                     <p>Get a copy of your signed dormitory agreement.</p>
                   </div>
-                  <button class="btn-primary">📥 Download</button>
+                  <button class="btn-primary">
+                    <img src="icons/download.svg" class="icon icon--btn" alt="download"> Download
+                  </button>
                 </div>
                 <div class="contract-action">
                   <div>
                     <strong>Upload Signed Contract</strong>
                     <p>Upload a scanned copy of your signed contract.</p>
                   </div>
-                  <button class="btn-primary">📤 Upload</button>
+                  <button class="btn-primary">
+                    <img src="icons/upload.svg" class="icon icon--btn" alt="upload"> Upload
+                  </button>
                 </div>
                 <div class="contract-action">
                   <div>
@@ -393,7 +437,9 @@
                   </div>
                   <button class="btn-primary" (click)="generateReport()" [disabled]="reportLoading">
                     @if (reportLoading) { <span class="spinner"></span> Generating… }
-                    @else { 📊 Export }
+                    @else {
+                      <img src="icons/chart-bar.svg" class="icon icon--btn" alt="export"> Export
+                    }
                   </button>
                 </div>
               </div>
@@ -466,7 +512,9 @@
           <div class="two-col">
             <!-- Payment form -->
             <div class="card form-card">
-              <h3 class="form-card__title">💳 Submit Payment</h3>
+              <h3 class="form-card__title">
+                <img src="icons/credit-card.svg" class="icon icon--title" alt="payment"> Submit Payment
+              </h3>
               <div class="field-group">
                 <label class="field-label">Month</label>
                 <select class="field-input" [(ngModel)]="paymentMonth">
@@ -529,11 +577,16 @@
             <div class="card__header" style="padding: 1rem 1.25rem 0">
               <h3 class="card__title">Payment History</h3>
               <button class="link-btn" (click)="generateReport()" [disabled]="reportLoading">
-                @if (reportLoading) { Generating… } @else { 📊 Export Report }
+                @if (reportLoading) { Generating… }
+                @else {
+                  <img src="icons/chart-bar.svg" class="icon icon--sm" alt="export"> Export Report
+                }
               </button>
             </div>
             @if (paymentsError) {
-              <div class="alert alert--error" style="margin: 1rem">⚠️ {{ paymentsError }}</div>
+              <div class="alert alert--error" style="margin: 1rem">
+                <img src="icons/exclamation-triangle.svg" class="icon icon--alert" alt="warning"> {{ paymentsError }}
+              </div>
             } @else if (paymentsLoading) {
               <div class="loading-state">Loading payments…</div>
             } @else {
@@ -577,7 +630,11 @@
               <p class="section__subtitle">Submit and track your maintenance requests and complaints.</p>
             </div>
             <button class="btn-primary" (click)="showComplaintForm = !showComplaintForm">
-              {{ showComplaintForm ? '✕ Cancel' : '➕ New Complaint' }}
+              @if (showComplaintForm) {
+                <img src="icons/x-mark.svg" class="icon icon--btn" alt="cancel"> Cancel
+              } @else {
+                <img src="icons/plus.svg" class="icon icon--btn" alt="new"> New Complaint
+              }
             </button>
           </div>
 
@@ -608,7 +665,9 @@
           }
 
           @if (complaintsError) {
-            <div class="alert alert--error">⚠️ {{ complaintsError }}</div>
+            <div class="alert alert--error">
+              <img src="icons/exclamation-triangle.svg" class="icon icon--alert" alt="warning"> {{ complaintsError }}
+            </div>
           }
 
           @if (complaintsLoading) {
@@ -655,7 +714,11 @@
               <p class="section__subtitle">Apply for dormitory accommodation or track your existing application.</p>
             </div>
             <button class="btn-primary" (click)="showAppForm = !showAppForm">
-              {{ showAppForm ? '✕ Cancel' : '➕ New Application' }}
+              @if (showAppForm) {
+                <img src="icons/x-mark.svg" class="icon icon--btn" alt="cancel"> Cancel
+              } @else {
+                <img src="icons/plus.svg" class="icon icon--btn" alt="new"> New Application
+              }
             </button>
           </div>
 
@@ -675,13 +738,16 @@
               <div class="apply-checklist">
                 <p class="field-label" style="margin-bottom: 0.5rem">Required Documents (upload in Documents section)</p>
                 <div class="checklist-item" [class.checklist-item--done]="documents[0].uploaded">
-                  <span>{{ documents[0].uploaded ? '✅' : '⬜' }}</span> Enrollment Certificate
+                  <img [src]="documents[0].uploaded ? 'icons/check-circle.svg' : 'icons/square.svg'"
+                       class="icon icon--sm" alt="status"> Enrollment Certificate
                 </div>
                 <div class="checklist-item" [class.checklist-item--done]="documents[1].uploaded">
-                  <span>{{ documents[1].uploaded ? '✅' : '⬜' }}</span> Student ID
+                  <img [src]="documents[1].uploaded ? 'icons/check-circle.svg' : 'icons/square.svg'"
+                       class="icon icon--sm" alt="status"> Student ID
                 </div>
                 <div class="checklist-item" [class.checklist-item--done]="documents[2].uploaded">
-                  <span>{{ documents[2].uploaded ? '✅' : '⬜' }}</span> Residence Card
+                  <img [src]="documents[2].uploaded ? 'icons/check-circle.svg' : 'icons/square.svg'"
+                       class="icon icon--sm" alt="status"> Residence Card
                 </div>
               </div>
 
@@ -698,7 +764,9 @@
           }
 
           @if (appsError) {
-            <div class="alert alert--error">⚠️ {{ appsError }}</div>
+            <div class="alert alert--error">
+              <img src="icons/exclamation-triangle.svg" class="icon icon--alert" alt="warning"> {{ appsError }}
+            </div>
           }
 
           @if (appsLoading) {

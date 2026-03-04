@@ -15,13 +15,38 @@ export class ApiService {
 
   // ── Admin: stats ──────────────────────────────────────────────────
   getStats(): Observable<{
-    totalStudents: number;
-    pendingApplications: number;
-    openComplaints: number;
-    activeContracts: number;
-    totalPayments: number;
+    totalRooms: number; occupiedRooms: number; vacantRooms: number; maintenanceRooms: number;
+    totalStudents: number; pendingApplications: number; openComplaints: number;
+    activeContracts: number; totalPayments: number;
   }> {
     return this.http.get<any>(`${this.BASE}/stats`, { headers: this.headers });
+  }
+
+  // ── Admin: rooms ──────────────────────────────────────────────────
+  getRooms(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.BASE}/rooms`, { headers: this.headers });
+  }
+
+  getVacantRooms(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.BASE}/rooms/vacant`, { headers: this.headers });
+  }
+
+  // ── Admin: activity feed ──────────────────────────────────────────
+  getActivity(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.BASE}/activity`, { headers: this.headers });
+  }
+
+  // ── Admin: profile ────────────────────────────────────────────────
+  getAdminProfile(): Observable<any> {
+    return this.http.get<any>(`${this.BASE}/admin/profile`, { headers: this.headers });
+  }
+
+  updateAdminProfile(data: {
+    name: string; email: string; position?: string; phone?: string;
+    dormitory_name: string; address?: string; contact_email?: string;
+    contact_phone?: string; max_capacity?: number;
+  }): Observable<any> {
+    return this.http.put(`${this.BASE}/admin/profile`, data, { headers: this.headers });
   }
 
   // ── Admin: users ──────────────────────────────────────────────────
@@ -38,13 +63,20 @@ export class ApiService {
     return this.http.post(`${this.BASE}/applications`, { submission_date }, { headers: this.headers });
   }
 
-  /** ADMIN only — update an application's status */
-  updateApplicationStatus(id: number, status: 'ACCEPTED' | 'REJECTED' | 'PENDING'): Observable<any> {
-    return this.http.patch(`${this.BASE}/applications/${id}/status`, { status }, { headers: this.headers });
+  /** ADMIN only — update an application's status. room_id required when accepting. */
+  updateApplicationStatus(
+    id: number,
+    status: 'ACCEPTED' | 'REJECTED' | 'PENDING',
+    room_id?: number
+  ): Observable<any> {
+    return this.http.patch(
+      `${this.BASE}/applications/${id}/status`,
+      { status, room_id },
+      { headers: this.headers }
+    );
   }
 
   // ── Contracts ─────────────────────────────────────────────────────
-  /** ADMIN: all contracts | STUDENT: own contract (single object or null) */
   getContracts(): Observable<any> {
     return this.http.get<any>(`${this.BASE}/contracts`, { headers: this.headers });
   }
@@ -53,7 +85,6 @@ export class ApiService {
     return this.http.post(`${this.BASE}/contracts`, { user_id, start_date, end_date, status }, { headers: this.headers });
   }
 
-  /** ADMIN only — update a contract's status */
   updateContractStatus(id: number, status: 'ACTIVE' | 'EXTENDED' | 'TERMINATED'): Observable<any> {
     return this.http.patch(`${this.BASE}/contracts/${id}/status`, { status }, { headers: this.headers });
   }
@@ -67,7 +98,6 @@ export class ApiService {
     return this.http.post(`${this.BASE}/complaints`, { description }, { headers: this.headers });
   }
 
-  /** ADMIN only — update a complaint's status */
   updateComplaintStatus(id: number, status: 'SUBMITTED' | 'IN_PROGRESS' | 'RESOLVED'): Observable<any> {
     return this.http.patch(`${this.BASE}/complaints/${id}/status`, { status }, { headers: this.headers });
   }
@@ -91,13 +121,14 @@ export class ApiService {
   }
 
   // ── Student profile ───────────────────────────────────────────────
-  /** STUDENT only — get own profile (users + student_profiles joined) */
   getProfile(): Observable<any> {
     return this.http.get<any>(`${this.BASE}/profile`, { headers: this.headers });
   }
 
-  /** STUDENT only — update name, email, academic_details */
-  updateProfile(data: { name: string; email: string; academic_details?: string }): Observable<any> {
+  updateProfile(data: {
+    name: string; email: string;
+    phone?: string; student_id_number?: string; course?: string; university?: string;
+  }): Observable<any> {
     return this.http.put(`${this.BASE}/profile`, data, { headers: this.headers });
   }
 }
