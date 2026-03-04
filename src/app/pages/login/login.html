@@ -2,15 +2,17 @@
   <!-- Left panel -->
   <div class="login-page__panel">
     <div class="login-page__brand" (click)="goHome()">
-      <span class="login-page__brand-icon">🏢</span>
+      <span class="login-page__brand-icon">
+        <img src="icons/building-office.svg" class="icon icon--brand" alt="DormMS">
+      </span>
       <span class="login-page__brand-name">DormMS</span>
     </div>
     <h2 class="login-page__tagline">Manage your dormitory<br />with confidence.</h2>
     <ul class="login-page__perks">
-      <li><span>✅</span> Real-time room availability</li>
-      <li><span>✅</span> Automated billing & invoices</li>
-      <li><span>✅</span> Maintenance ticket tracking</li>
-      <li><span>✅</span> Comprehensive reports</li>
+      <li><img src="icons/check-circle.svg" class="icon" alt="check"> Real-time room availability</li>
+      <li><img src="icons/check-circle.svg" class="icon" alt="check"> Automated billing & invoices</li>
+      <li><img src="icons/check-circle.svg" class="icon" alt="check"> Maintenance ticket tracking</li>
+      <li><img src="icons/check-circle.svg" class="icon" alt="check"> Comprehensive reports</li>
     </ul>
   </div>
 
@@ -25,14 +27,16 @@
       <form class="login-form" (ngSubmit)="onSubmit()" #loginForm="ngForm" novalidate>
         @if (errorMsg) {
           <div class="login-form__error">
-            <span>⚠️</span> {{ errorMsg }}
+            <img src="icons/exclamation-triangle.svg" class="icon" alt="error"> {{ errorMsg }}
           </div>
         }
 
         <div class="form-group">
           <label class="form-label" for="email">Email Address</label>
           <div class="form-input-wrap">
-            <span class="form-input-icon">✉️</span>
+            <span class="form-input-icon">
+              <img src="icons/envelope.svg" class="icon" alt="email">
+            </span>
             <input
               id="email"
               type="email"
@@ -49,7 +53,9 @@
         <div class="form-group">
           <label class="form-label" for="password">Password</label>
           <div class="form-input-wrap">
-            <span class="form-input-icon">🔒</span>
+            <span class="form-input-icon">
+              <img src="icons/lock-closed.svg" class="icon" alt="password">
+            </span>
             <input
               id="password"
               [type]="showPassword ? 'text' : 'password'"
@@ -61,7 +67,7 @@
               required
             />
             <button type="button" class="form-input-toggle" (click)="togglePassword()">
-              {{ showPassword ? '🙈' : '👁️' }}
+              <img [src]="showPassword ? 'icons/eye-slash.svg' : 'icons/eye.svg'" class="icon" alt="toggle password">
             </button>
           </div>
         </div>
@@ -83,8 +89,14 @@
       </form>
 
       <div class="login-card__hints">
-        <p class="login-card__hint"><span>🛡️ Admin —</span> <code>admin&#64;dms.com</code> / <code>admin123</code></p>
-        <p class="login-card__hint"><span>🎓 Student —</span> <code>student&#64;dms.com</code> / <code>student123</code></p>
+        <p class="login-card__hint">
+          <span><img src="icons/shield-check.svg" class="icon" alt="admin"> Admin —</span>
+          <code>admin&#64;dms.com</code> / <code>admin123</code>
+        </p>
+        <p class="login-card__hint">
+          <span><img src="icons/academic-cap.svg" class="icon" alt="student"> Student —</span>
+          <code>student&#64;dms.com</code> / <code>student123</code>
+        </p>
       </div>
     </div>
   </div>

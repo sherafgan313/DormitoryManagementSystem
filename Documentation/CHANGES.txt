@@ -1,0 +1,238 @@
+================================================================================
+  DORMITORY MANAGEMENT SYSTEM — CHANGES SUMMARY
+  Version 2.0 — Multi-Dormitory Support & Full API Integration
+================================================================================
+
+--------------------------------------------------------------------------------
+REQUIREMENT 1: Admin Profile Stored and Fetched from Database
+--------------------------------------------------------------------------------
+WHAT:
+  Admin users now have a persistent profile in the database, including their
+  personal info and dormitory configuration (previously static in the Settings
+  page).
+
+HOW:
+  • New DB table: admin_profiles (user_id, dormitory_id, position, phone)
+  • New API endpoint: GET /api/admin/profile
+    – JOINs users + admin_profiles + dormitories to return a full profile.
+  • New API endpoint: PUT /api/admin/profile
+    – Updates users (name, email), admin_profiles (position, phone), and
+      dormitories (name, address, contact_email, contact_phone, max_capacity).
+  • Admin Dashboard Settings section completely replaced with a real profile
+    form (dashboard.html + dashboard.ts) that loads on init and saves to API.
+  • loadAdminProfile() called on ngOnInit and when navigating to Settings.
+
+FILES CHANGED:
+  Documentation/dorm_management.sql — new admin_profiles table
+  server.js — GET/PUT /api/admin/profile endpoints
+  src/app/services/api.service.ts — getAdminProfile(), updateAdminProfile()
+  src/app/pages/dashboard/dashboard.ts — adminProfile object, loadAdminProfile(), saveAdminProfile()
+  src/app/pages/dashboard/dashboard.html — Settings section rewritten
+
+--------------------------------------------------------------------------------
+REQUIREMENT 2: Students Linked to Dormitory
+--------------------------------------------------------------------------------
+WHAT:
+  Each student is now linked to a dormitory and assigned room, stored in the
+  database. The student dashboard shows real dormitory name and room info
+  fetched from the API.
+
+HOW:
+  • users.dormitory_id column added — set when student application is accepted.
+  • student_profiles updated: added dormitory_id, room_id, phone,
+    student_id_number, course, university columns.
+  • GET /api/profile now JOINs dormitories and rooms to return dormitory_name,
+    dorm_contact_email, dorm_contact_phone, room_number, floor, room_type.
+  • PUT /api/profile now saves phone, student_id_number, course, university.
+  • StudentDashboardComponent.loadProfile() populates roomInfo, dormitoryName,
+    and importantContacts with live API data.
+
+FILES CHANGED:
+  Documentation/dorm_management.sql — student_profiles and users schema
+  server.js — GET/PUT /api/profile updated with JOINs and new fields
+  src/app/services/api.service.ts — updateProfile() new parameter signature
+  src/app/pages/student-dashboard/student-dashboard.ts — loadProfile() rewritten
+  src/app/pages/student-dashboard/student-dashboard.html — shows dormitory name
+
+--------------------------------------------------------------------------------
+REQUIREMENT 3: Multiple Dormitories, Multiple Admins per Dormitory
+--------------------------------------------------------------------------------
+WHAT:
+  System now supports multiple dormitories. Multiple admin accounts can manage
+  the same dormitory. One user can only belong to one dormitory.
+
+HOW:
+  • New DB table: dormitories (dormitory_id, name, address, contact_email,
+    contact_phone, max_capacity).
+  • admin_profiles links each ADMIN user to exactly one dormitory (UNIQUE on
+    user_id ensures one-dorm-per-admin).
+  • users.dormitory_id enforces one-dormitory-per-user (for students, set on
+    acceptance; for admins, set at account creation).
+  • Seeder creates 2 dormitories:
+    – "Sunrise Dormitory" (admin@dms.com / admin123)
+    – "Moonlight Dormitory" (admin2@dms.com / admin123)
+  • dormitory_id is included in the JWT payload so every request carries
+    context without extra DB queries.
+
+FILES CHANGED:
+  Documentation/dorm_management.sql — new dormitories table; FK on users
+  server.js — seedDemoData() with 2 dorms; JWT includes dormitory_id
+
+--------------------------------------------------------------------------------
+REQUIREMENT 4: Admin Dashboard Filtered by Dormitory
+--------------------------------------------------------------------------------
+WHAT:
+  All admin-facing data is now scoped to the admin's own dormitory.
+
+HOW:
+  • JWT payload extended: { id, role, dormitory_id }
+  • Login response includes dormitory_id (stored in localStorage via AuthService)
+  • All admin GET endpoints now filter by req.user.dormitory_id:
+    – GET /api/stats    — room counts, student count, complaint count per dorm
+    – GET /api/rooms    — only rooms in admin's dorm
+    – GET /api/applications — PENDING (all) + admin's dorm accepted/rejected
+    – GET /api/complaints  — only admin's dorm complaints
+    – GET /api/payments    — only admin's dorm payments
+    – GET /api/reports     — only admin's dorm reports
+    – GET /api/contracts   — only admin's dorm contracts
+    – GET /api/users       — only students in admin's dorm
+  • POST endpoints (complaints, payments, reports) save dormitory_id from JWT.
+
+FILES CHANGED:
+  server.js — all admin GET endpoints updated; POST endpoints save dormitory_id
+  src/app/services/auth.service.ts — stores/retrieves dormitory_id
+
+--------------------------------------------------------------------------------
+REQUIREMENT 5: Room Counts, Room Assignment on Acceptance, Room Status Updates
+--------------------------------------------------------------------------------
+WHAT:
+  Room inventory (total/occupied/vacant/maintenance) is now tracked in the DB.
+  When an admin accepts an application, they must select a vacant room. The
+  room status, resident link, and student profile are all updated automatically.
+
+HOW:
+  • New DB table: rooms (room_id, dormitory_id, room_number, floor, type,
+    status ENUM('occupied','vacant','maintenance'), resident_id).
+  • GET /api/stats returns totalRooms, occupiedRooms, vacantRooms,
+    maintenanceRooms (all derived live from the rooms table).
+  • GET /api/rooms — all rooms for admin's dorm with resident_name JOIN.
+  • GET /api/rooms/vacant — only vacant rooms (for the acceptance dropdown).
+  • PATCH /api/applications/:id/status — when status=ACCEPTED:
+    1. Requires room_id in request body.
+    2. Runs a DB transaction:
+       a. UPDATE rooms SET status='occupied', resident_id=userId WHERE vacant.
+       b. UPDATE users SET dormitory_id = admin's dorm.
+       c. UPSERT student_profiles (dormitory_id, room_id, application_status).
+       d. UPDATE dorm_applications (status, dormitory_id, assigned_room_id).
+    3. Rolls back if room is not vacant (prevents double-assignment).
+  • Admin dashboard Residents section has a two-step Accept flow:
+    1. Click "Accept" → loads vacant rooms, shows dropdown in that table row.
+    2. Select room → click "Confirm" → sends PATCH with room_id.
+    3. On success, reloads applications, stats, and rooms.
+
+FILES CHANGED:
+  Documentation/dorm_management.sql — new rooms table
+  server.js — GET /api/rooms, GET /api/rooms/vacant, PATCH /api/applications/:id/status (transaction)
+  src/app/services/api.service.ts — getRooms(), getVacantRooms(), updateApplicationStatus() with room_id
+  src/app/pages/dashboard/dashboard.ts — startAcceptApplication(), confirmAcceptApplication(), rejectApplication(), loadRooms()
+  src/app/pages/dashboard/dashboard.html — inline room selector in applications table
+  src/app/pages/dashboard/dashboard.scss — .field-input--sm for compact dropdown
+
+--------------------------------------------------------------------------------
+REQUIREMENT 6: Remove All Static Data — Everything from API
+--------------------------------------------------------------------------------
+WHAT:
+  All hardcoded static data removed from the admin and student dashboards.
+  Everything is fetched from the database via REST API calls.
+
+HOW:
+  Admin Dashboard (previously static → now from API):
+  • Stats cards — from GET /api/stats (room counts + student/complaint counts)
+  • Recent Activity — from GET /api/activity (unified applications + complaints + payments)
+  • Room grid — from GET /api/rooms
+  • Residents (applications) — from GET /api/applications
+  • Payments — from GET /api/payments
+  • Complaints — from GET /api/complaints
+  • Reports — from GET /api/reports
+  • Settings — from GET /api/admin/profile
+
+  Student Dashboard (previously static → now from API):
+  • Student name/email — from GET /api/profile
+  • Room info — from GET /api/profile (JOINed with rooms)
+  • Dormitory name/contacts — from GET /api/profile (JOINed with dormitories)
+  • Contract details — from GET /api/contracts
+  • Complaints/activity — from GET /api/complaints
+  • Payments history — from GET /api/payments
+  • Application history — from GET /api/applications
+
+  Seed data (2 dorms, 2 admins, 5 students, 32 rooms each, applications,
+  contracts, complaints, payments) is seeded by server.js on first startup.
+
+FILES CHANGED:
+  server.js — comprehensive seedDemoData(); GET /api/activity endpoint
+  src/app/pages/dashboard/dashboard.ts — all static arrays removed, API methods added
+  src/app/pages/student-dashboard/student-dashboard.ts — all static data removed
+
+--------------------------------------------------------------------------------
+REQUIREMENT 7: State Management Fix — Auto-Load on Navigation
+--------------------------------------------------------------------------------
+WHAT:
+  Data now loads automatically. Previously, some sections only loaded data
+  after specific button clicks. Now all sections preload on init and reload
+  on every navigation.
+
+HOW:
+  Admin Dashboard (DashboardComponent):
+  • ngOnInit() now calls: loadAdminStats(), loadRooms(), loadActivity(),
+    loadApplications(), loadComplaints(), loadPayments(), loadReports(),
+    loadAdminProfile() — all triggered immediately on component mount.
+  • setActive(id) always triggers a reload for the relevant section:
+    'dashboard' → loadAdminStats() + loadActivity()
+    'rooms'     → loadRooms()
+    'residents' → loadApplications()
+    'payments'  → loadPayments()
+    'requests'  → loadComplaints()
+    'reports'   → loadReports()
+    'settings'  → loadAdminProfile()
+  • Mutations (accept/reject, status update, record payment, generate report)
+    trigger reload of the relevant list after success.
+
+  Student Dashboard (StudentDashboardComponent):
+  • ngOnInit() now calls: loadProfile(), loadMyContract(), loadComplaints(),
+    loadApplications(), loadPayments() — all triggered on mount.
+  • setActive(id) always triggers reload for the target section.
+
+FILES CHANGED:
+  src/app/pages/dashboard/dashboard.ts — ngOnInit and setActive updated
+  src/app/pages/student-dashboard/student-dashboard.ts — ngOnInit and setActive updated
+
+--------------------------------------------------------------------------------
+SUMMARY OF ALL FILES CHANGED
+--------------------------------------------------------------------------------
+  Documentation/dorm_management.sql    — Schema v2: new tables, InnoDB, FK constraints
+  server.js                            — Full rewrite: seeder, new endpoints, filtering
+  src/app/services/auth.service.ts     — dormitory_id added to KEYS and methods
+  src/app/services/api.service.ts      — New methods: getRooms, getVacantRooms,
+                                          getAdminProfile, updateAdminProfile, getActivity;
+                                          updateApplicationStatus accepts optional room_id
+  src/app/pages/dashboard/dashboard.ts      — Static data removed; full API integration;
+                                              room assignment flow; admin profile
+  src/app/pages/dashboard/dashboard.html    — Topbar, rooms, acceptance, settings updated
+  src/app/pages/dashboard/dashboard.scss    — .field-input--sm added
+  src/app/pages/student-dashboard/student-dashboard.ts   — Static data removed; full API
+  src/app/pages/student-dashboard/student-dashboard.html — Dormitory name shown; date dynamic
+
+================================================================================
+DEMO CREDENTIALS (seeded by server.js on first start)
+================================================================================
+  Admin 1:  admin@dms.com   / admin123  → Sunrise Dormitory (32 rooms, 3 students)
+  Admin 2:  admin2@dms.com  / admin123  → Moonlight Dormitory (32 rooms, no students)
+  Student:  student@dms.com / student123 → Room 101, Sunrise Dormitory (accepted)
+  Others:   juan@dms.com, ana@dms.com (accepted) | pedro@dms.com, rosa@dms.com (pending)
+  All students use password: student123
+
+SETUP:
+  1. mysql -u root dorm_management < Documentation/dorm_management.sql
+  2. node server.js        (seeds data on first start)
+  3. npm start             (Angular dev server on port 4200)
+================================================================================

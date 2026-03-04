@@ -3,7 +3,9 @@
   <!-- ═══ SIDEBAR ════════════════════════════════════════════════════ -->
   <aside class="sidebar">
     <div class="sidebar__brand">
-      <span class="sidebar__brand-icon">🏢</span>
+      <span class="sidebar__brand-icon">
+        <img src="icons/building-office.svg" class="icon" alt="DormMS">
+      </span>
       @if (sidebarOpen) {
         <span class="sidebar__brand-name">DormMS</span>
       }
@@ -16,7 +18,9 @@
           [class.sidebar__nav-item--active]="activeNav === item.id"
           (click)="setActive(item.id)"
         >
-          <span class="sidebar__nav-icon">{{ item.icon }}</span>
+          <span class="sidebar__nav-icon">
+            <img [src]="'icons/' + item.icon" class="icon" [alt]="item.label">
+          </span>
           @if (sidebarOpen) {
             <span class="sidebar__nav-label">{{ item.label }}</span>
           }
@@ -25,7 +29,7 @@
     </nav>
 
     <button class="sidebar__logout" (click)="logout()">
-      <span>🚪</span>
+      <img src="icons/logout.svg" class="icon" alt="logout">
       @if (sidebarOpen) { <span>Logout</span> }
     </button>
   </aside>
@@ -37,15 +41,17 @@
     <header class="topbar">
       <div class="topbar__left">
         <button class="topbar__toggle" (click)="toggleSidebar()">
-          {{ sidebarOpen ? '◀' : '▶' }}
+          <img [src]="sidebarOpen ? 'icons/chevron-left.svg' : 'icons/chevron-right.svg'" class="icon" alt="toggle sidebar">
         </button>
         <span class="topbar__page">{{ pageName }}</span>
       </div>
       <div class="topbar__right">
-        <button class="topbar__icon-btn" title="Notifications">🔔</button>
-        <div class="topbar__avatar"><span>A</span></div>
+        <button class="topbar__icon-btn" title="Notifications">
+          <img src="icons/bell.svg" class="icon" alt="notifications">
+        </button>
+        <div class="topbar__avatar"><span>{{ adminInitials }}</span></div>
         <div class="topbar__user">
-          <span class="topbar__user-name">Admins</span>
+          <span class="topbar__user-name">{{ adminName }}</span>
           <span class="topbar__user-role">Administrator</span>
         </div>
       </div>
@@ -58,24 +64,31 @@
       @if (activeNav === 'dashboard') {
         <div class="content__welcome">
           <div>
-            <h1 class="content__title">Good morning, Admin 👋</h1>
-            <p class="content__subtitle">Here's what's happening in your dormitory today.</p>
+            <h1 class="content__title">
+              Good morning, {{ adminName.split(' ')[0] }}
+              <img src="icons/hand-raised.svg" class="icon icon--wave" alt="wave">
+            </h1>
+            <p class="content__subtitle">Here's what's happening in {{ adminProfile.dormitory_name || 'your dormitory' }} today.</p>
           </div>
-          <span class="content__date">March 1, 2026</span>
+          <span class="content__date">{{ today | date:'MMMM d, y' }}</span>
         </div>
 
         <div class="stats-grid">
           @for (stat of stats; track stat.label) {
             <div class="stat-card stat-card--{{ stat.color }}">
               <div class="stat-card__top">
-                <span class="stat-card__icon">{{ stat.icon }}</span>
+                <span class="stat-card__icon">
+                  <img [src]="'icons/' + stat.icon" class="icon" [alt]="stat.label">
+                </span>
                 <span class="stat-card__label">{{ stat.label }}</span>
               </div>
               <div class="stat-card__value">{{ stat.value }}</div>
               <div class="stat-card__change"
                    [class.stat-card__change--positive]="stat.positive"
                    [class.stat-card__change--negative]="!stat.positive">
-                {{ stat.positive ? '▲' : '▼' }} {{ stat.change }}
+                <img [src]="stat.positive ? 'icons/arrow-trending-up.svg' : 'icons/arrow-trending-down.svg'"
+                     class="icon icon--xs" [alt]="stat.positive ? 'up' : 'down'">
+                {{ stat.change }}
               </div>
             </div>
           }
@@ -91,7 +104,9 @@
             <ul class="activity-list">
               @for (item of recentActivity; track item.message) {
                 <li class="activity-item">
-                  <span class="activity-item__icon">{{ item.icon }}</span>
+                  <span class="activity-item__icon">
+                    <img [src]="'icons/' + item.icon" class="icon" [alt]="item.type">
+                  </span>
                   <div class="activity-item__info">
                     <p class="activity-item__msg">{{ item.message }}</p>
                     <span class="activity-item__time">{{ item.time }}</span>
@@ -108,35 +123,35 @@
             </div>
             <div class="quick-actions">
               <button class="quick-btn quick-btn--blue"   (click)="navigateTo('residents')">
-                <span>📋</span> Applications
+                <img src="icons/clipboard-list.svg" class="icon" alt="applications"> Applications
               </button>
               <button class="quick-btn quick-btn--green"  (click)="navigateTo('rooms')">
-                <span>🏠</span> View Rooms
+                <img src="icons/home.svg" class="icon" alt="rooms"> View Rooms
               </button>
               <button class="quick-btn quick-btn--orange" (click)="navigateTo('payments')">
-                <span>💳</span> Record Payment
+                <img src="icons/credit-card.svg" class="icon" alt="payment"> Record Payment
               </button>
               <button class="quick-btn quick-btn--red"    (click)="navigateTo('requests')">
-                <span>🔧</span> Complaints
+                <img src="icons/wrench.svg" class="icon" alt="complaints"> Complaints
               </button>
               <button class="quick-btn quick-btn--purple" (click)="navigateTo('reports')">
-                <span>📊</span> Gen. Report
+                <img src="icons/chart-bar.svg" class="icon" alt="reports"> Gen. Report
               </button>
               <button class="quick-btn quick-btn--teal"   (click)="navigateTo('settings')">
-                <span>⚙️</span> Settings
+                <img src="icons/cog.svg" class="icon" alt="settings"> Settings
               </button>
             </div>
 
             <div class="card__header" style="margin-top:1.5rem">
               <h2 class="card__title">Occupancy</h2>
-              <span class="card__badge">81%</span>
+              <span class="card__badge">{{ occupancyPct }}%</span>
             </div>
             <div class="occupancy-bar">
-              <div class="occupancy-bar__fill" style="width:81%"></div>
+              <div class="occupancy-bar__fill" [style.width.%]="occupancyPct"></div>
             </div>
             <div class="occupancy-legend">
-              <span><span class="dot dot--occupied"></span> Occupied (104)</span>
-              <span><span class="dot dot--vacant"></span> Vacant (24)</span>
+              <span><span class="dot dot--occupied"></span> Occupied ({{ dormStats.occupiedRooms ?? '—' }})</span>
+              <span><span class="dot dot--vacant"></span> Vacant ({{ dormStats.vacantRooms ?? '—' }})</span>
             </div>
           </div>
         </div>
@@ -148,7 +163,7 @@
           <div class="section__header">
             <div>
               <h1 class="section__title">Room Management</h1>
-              <p class="section__subtitle">Overview of all {{ rooms.length }} rooms across 4 floors.</p>
+              <p class="section__subtitle">Overview of all {{ rooms.length }} rooms across {{ floors.length }} floors.</p>
             </div>
             <div class="room-legend">
               <span class="legend-item"><span class="dot dot--occupied"></span> Occupied</span>
@@ -164,19 +179,23 @@
             <button class="filter-tab" [class.filter-tab--active]="roomFilter==='maintenance'" (click)="roomFilter='maintenance'">Maintenance ({{ maintenanceCount }})</button>
           </div>
 
-          @if (filteredRooms.length === 0) {
+          @if (roomsLoading) {
+            <div class="loading-state">Loading rooms…</div>
+          } @else if (roomsError) {
+            <div class="alert alert--error"><img src="icons/exclamation-triangle.svg" class="icon icon--alert" alt="error"> {{ roomsError }}</div>
+          } @else if (filteredRooms.length === 0) {
             <div class="empty-state">No rooms match the selected filter.</div>
           } @else {
             @for (floor of floors; track floor) {
               <div class="floor-section">
                 <h3 class="floor-title">Floor {{ floor }}</h3>
                 <div class="room-grid">
-                  @for (room of roomsOnFloor(floor); track room.number) {
+                  @for (room of roomsOnFloor(floor); track room.room_id) {
                     <div class="room-card room-card--{{ room.status }}">
-                      <div class="room-card__number">{{ room.number }}</div>
+                      <div class="room-card__number">{{ room.room_number }}</div>
                       <div class="room-card__type">{{ room.type }}</div>
                       @if (room.status === 'occupied') {
-                        <div class="room-card__resident">{{ room.resident }}</div>
+                        <div class="room-card__resident">{{ room.resident_name }}</div>
                         <span class="badge badge--success">Occupied</span>
                       } @else if (room.status === 'vacant') {
                         <div class="room-card__resident room-card__resident--empty">Available</div>
@@ -203,7 +222,11 @@
               <p class="section__subtitle">All student applications and their current status.</p>
             </div>
             <button class="btn-primary" (click)="showAppForm = !showAppForm">
-              {{ showAppForm ? '✕ Cancel' : '➕ New Application' }}
+              @if (showAppForm) {
+                <img src="icons/x-mark.svg" class="icon icon--btn" alt="cancel"> Cancel
+              } @else {
+                <img src="icons/plus.svg" class="icon icon--btn" alt="new"> New Application
+              }
             </button>
           </div>
 
@@ -226,7 +249,9 @@
           }
 
           @if (appsError) {
-            <div class="alert alert--error">⚠️ {{ appsError }}</div>
+            <div class="alert alert--error">
+              <img src="icons/exclamation-triangle.svg" class="icon icon--alert" alt="warning"> {{ appsError }}
+            </div>
           }
 
           @if (appsLoading) {
@@ -265,14 +290,29 @@
                       <td class="td-muted">{{ app.created_at | date:'short' }}</td>
                       <td class="td-actions">
                         @if (app.status === 'PENDING') {
-                          <button class="action-btn action-btn--accept"
-                                  (click)="updateApplicationStatus(app.application_id, 'ACCEPTED')">
-                            ✓ Accept
-                          </button>
-                          <button class="action-btn action-btn--reject"
-                                  (click)="updateApplicationStatus(app.application_id, 'REJECTED')">
-                            ✕ Reject
-                          </button>
+                          @if (acceptingAppId === app.application_id) {
+                            <select class="field-input field-input--sm" [(ngModel)]="selectedRoomId">
+                              <option [value]="0" disabled>Select room…</option>
+                              @for (r of vacantRooms; track r.room_id) {
+                                <option [value]="r.room_id">{{ r.room_number }} (Fl.{{ r.floor }}, {{ r.type }})</option>
+                              }
+                            </select>
+                            <button class="action-btn action-btn--accept" (click)="confirmAcceptApplication(app.application_id)">
+                              <img src="icons/check.svg" class="icon icon--sm" alt="confirm"> Confirm
+                            </button>
+                            <button class="action-btn action-btn--reject" (click)="cancelAccept()">
+                              <img src="icons/x-mark.svg" class="icon icon--sm" alt="cancel"> Cancel
+                            </button>
+                          } @else {
+                            <button class="action-btn action-btn--accept" (click)="startAcceptApplication(app.application_id)">
+                              <img src="icons/check.svg" class="icon icon--sm" alt="accept"> Accept
+                            </button>
+                            <button class="action-btn action-btn--reject" (click)="rejectApplication(app.application_id)">
+                              <img src="icons/x-mark.svg" class="icon icon--sm" alt="reject"> Reject
+                            </button>
+                          }
+                        } @else if (app.assigned_room_number) {
+                          <span class="td-muted">Room {{ app.assigned_room_number }}</span>
                         }
                       </td>
                     </tr>
@@ -303,7 +343,9 @@
           <div class="two-col">
             <!-- Payment form -->
             <div class="card form-card">
-              <h3 class="form-card__title">💳 Record Payment</h3>
+              <h3 class="form-card__title">
+                <img src="icons/credit-card.svg" class="icon icon--title" alt="payment"> Record Payment
+              </h3>
               <div class="field-group">
                 <label class="field-label">Month</label>
                 <select class="field-input" [(ngModel)]="paymentMonth">
@@ -361,7 +403,9 @@
               <h3 class="card__title">Payment History</h3>
             </div>
             @if (paymentsError) {
-              <div class="alert alert--error" style="margin:1rem">⚠️ {{ paymentsError }}</div>
+              <div class="alert alert--error" style="margin:1rem">
+                <img src="icons/exclamation-triangle.svg" class="icon icon--alert" alt="warning"> {{ paymentsError }}
+              </div>
             } @else if (paymentsLoading) {
               <div class="loading-state">Loading payments…</div>
             } @else {
@@ -369,7 +413,7 @@
                 <thead>
                   <tr>
                     <th>Payment ID</th>
-                    <th>User ID</th>
+                    <th>Student</th>
                     <th>Month</th>
                     <th>Amount</th>
                     <th>Date</th>
@@ -379,7 +423,7 @@
                   @for (p of payments; track p.payment_id) {
                     <tr>
                       <td class="td-mono">#{{ p.payment_id }}</td>
-                      <td>User {{ p.user_id }}</td>
+                      <td><span class="td-name">{{ p.user_name ?? 'User ' + p.user_id }}</span></td>
                       <td>{{ p.month }}</td>
                       <td class="td-amount">₱{{ p.amount | number:'1.2-2' }}</td>
                       <td class="td-muted">{{ p.created_at | date:'short' }}</td>
@@ -405,7 +449,11 @@
               <p class="section__subtitle">Track and resolve resident complaints and maintenance requests.</p>
             </div>
             <button class="btn-primary" (click)="showComplaintForm = !showComplaintForm">
-              {{ showComplaintForm ? '✕ Cancel' : '➕ New Complaint' }}
+              @if (showComplaintForm) {
+                <img src="icons/x-mark.svg" class="icon icon--btn" alt="cancel"> Cancel
+              } @else {
+                <img src="icons/plus.svg" class="icon icon--btn" alt="new"> New Complaint
+              }
             </button>
           </div>
 
@@ -431,7 +479,9 @@
           }
 
           @if (complaintsError) {
-            <div class="alert alert--error">⚠️ {{ complaintsError }}</div>
+            <div class="alert alert--error">
+              <img src="icons/exclamation-triangle.svg" class="icon icon--alert" alt="warning"> {{ complaintsError }}
+            </div>
           }
 
           @if (complaintsLoading) {
@@ -472,12 +522,12 @@
                         @if (c.status === 'SUBMITTED') {
                           <button class="action-btn action-btn--info"
                                   (click)="updateComplaintStatus(c.complaint_id, 'IN_PROGRESS')">
-                            ▶ In Progress
+                            <img src="icons/play.svg" class="icon icon--sm" alt="in progress"> In Progress
                           </button>
                         } @else if (c.status === 'IN_PROGRESS') {
                           <button class="action-btn action-btn--accept"
                                   (click)="updateComplaintStatus(c.complaint_id, 'RESOLVED')">
-                            ✓ Resolve
+                            <img src="icons/check.svg" class="icon icon--sm" alt="resolve"> Resolve
                           </button>
                         }
                       </td>
@@ -509,14 +559,16 @@
           <div class="two-col">
             <!-- Generate card -->
             <div class="card form-card">
-              <h3 class="form-card__title">📊 Generate Report</h3>
+              <h3 class="form-card__title">
+                <img src="icons/chart-bar.svg" class="icon icon--title" alt="report"> Generate Report
+              </h3>
               <p class="form-card__desc">
                 Creates a full dormitory report including occupancy, payment status, and complaint summaries.
                 The report is saved to the server and can be downloaded later.
               </p>
               <div class="report-types">
                 <div class="report-type report-type--active">
-                  <span>📈</span>
+                  <img src="icons/trending-up.svg" class="icon icon--lg" alt="full report">
                   <div>
                     <strong>Full Report</strong>
                     <p>Occupancy + payments + complaints</p>
@@ -526,7 +578,9 @@
               <button class="btn-primary btn-full" style="margin-top:1.1rem"
                       (click)="generateReport()" [disabled]="reportLoading">
                 @if (reportLoading) { <span class="spinner"></span> Generating… }
-                @else { 📊 Generate Report }
+                @else {
+                  <img src="icons/chart-bar.svg" class="icon icon--btn" alt="generate"> Generate Report
+                }
               </button>
               @if (reportMsg) {
                 <div class="alert" [class.alert--success]="!reportErr" [class.alert--error]="reportErr"
@@ -543,21 +597,21 @@
               </div>
               <div class="info-list">
                 <div class="info-row">
-                  <span class="info-icon">🏠</span>
+                  <img src="icons/home.svg" class="icon info-icon" alt="occupancy">
                   <div>
                     <strong>Occupancy</strong>
                     <p>Current room usage: 81% (104/128)</p>
                   </div>
                 </div>
                 <div class="info-row">
-                  <span class="info-icon">💳</span>
+                  <img src="icons/credit-card.svg" class="icon info-icon" alt="payments">
                   <div>
                     <strong>Payments</strong>
                     <p>13 pending — ₱45,200 outstanding</p>
                   </div>
                 </div>
                 <div class="info-row">
-                  <span class="info-icon">🔧</span>
+                  <img src="icons/wrench.svg" class="icon info-icon" alt="complaints">
                   <div>
                     <strong>Complaints</strong>
                     <p>7 open requests, 2 urgent</p>
@@ -573,7 +627,9 @@
               <h3 class="card__title">Report History</h3>
             </div>
             @if (reportsError) {
-              <div class="alert alert--error" style="margin:1rem">⚠️ {{ reportsError }}</div>
+              <div class="alert alert--error" style="margin:1rem">
+                <img src="icons/exclamation-triangle.svg" class="icon icon--alert" alt="warning"> {{ reportsError }}
+              </div>
             } @else if (reportsLoading) {
               <div class="loading-state">Loading reports…</div>
             } @else {
@@ -590,9 +646,13 @@
                   @for (r of reports; track r.report_id) {
                     <tr>
                       <td class="td-mono">RPT-{{ r.report_id.toString().padStart(3, '0') }}</td>
-                      <td>User {{ r.generated_by }}</td>
+                      <td>{{ r.generated_by_name ?? 'User ' + r.generated_by }}</td>
                       <td class="td-muted">{{ r.generation_date | date:'short' }}</td>
-                      <td><a class="link-btn" [href]="r.file_path" target="_blank">📥 Download</a></td>
+                      <td>
+                        <a class="link-btn" [href]="r.file_path" target="_blank">
+                          <img src="icons/download.svg" class="icon icon--sm" alt="download"> Download
+                        </a>
+                      </td>
                     </tr>
                   } @empty {
                     <tr>
@@ -606,52 +666,91 @@
         </div>
       }
 
-      <!-- ─── SETTINGS ──────────────────────────────────────────────── -->
+      <!-- ─── SETTINGS / ADMIN PROFILE ─────────────────────────────── -->
       @if (activeNav === 'settings') {
         <div class="section">
           <div class="section__header">
             <div>
               <h1 class="section__title">Settings</h1>
-              <p class="section__subtitle">Manage dormitory configuration and preferences.</p>
+              <p class="section__subtitle">Manage your admin profile and dormitory configuration.</p>
             </div>
           </div>
 
-          @if (settingsMsg) {
-            <div class="alert alert--success">✅ {{ settingsMsg }}</div>
+          @if (adminProfileMsg) {
+            <div class="alert" [class.alert--success]="!adminProfileErr" [class.alert--error]="adminProfileErr"
+                 style="margin-bottom:1.25rem">
+              <img [src]="adminProfileErr ? 'icons/exclamation-triangle.svg' : 'icons/check-circle.svg'"
+                   class="icon icon--alert" alt="status"> {{ adminProfileMsg }}
+            </div>
           }
 
-          <div class="two-col">
-            <!-- General settings -->
-            <div class="card form-card">
-              <h3 class="form-card__title">🏢 General Settings</h3>
-              <div class="field-group">
-                <label class="field-label">Dormitory Name</label>
-                <input type="text" class="field-input" [(ngModel)]="settings.dormName" />
+          @if (adminProfileLoading) {
+            <div class="loading-state">Loading profile…</div>
+          } @else {
+            <div class="two-col">
+              <!-- Admin personal info -->
+              <div class="card form-card">
+                <h3 class="form-card__title">
+                  <img src="icons/user.svg" class="icon icon--title" alt="admin"> Admin Profile
+                </h3>
+                <div class="field-group">
+                  <label class="field-label">Full Name</label>
+                  <input type="text" class="field-input" [(ngModel)]="adminProfile.name" />
+                </div>
+                <div class="field-group" style="margin-top:0.85rem">
+                  <label class="field-label">Email Address</label>
+                  <input type="email" class="field-input" [(ngModel)]="adminProfile.email" />
+                </div>
+                <div class="field-group" style="margin-top:0.85rem">
+                  <label class="field-label">Position / Title</label>
+                  <input type="text" class="field-input" [(ngModel)]="adminProfile.position" />
+                </div>
+                <div class="field-group" style="margin-top:0.85rem">
+                  <label class="field-label">Phone Number</label>
+                  <input type="text" class="field-input" [(ngModel)]="adminProfile.phone" />
+                </div>
               </div>
-              <div class="field-group" style="margin-top:0.85rem">
-                <label class="field-label">Address</label>
-                <input type="text" class="field-input" [(ngModel)]="settings.address" />
-              </div>
-              <div class="field-group" style="margin-top:0.85rem">
-                <label class="field-label">Max Capacity</label>
-                <input type="number" class="field-input" [(ngModel)]="settings.maxCapacity" min="1" />
-              </div>
-              <div class="field-group" style="margin-top:0.85rem">
-                <label class="field-label">Contact Email</label>
-                <input type="email" class="field-input" [(ngModel)]="settings.contactEmail" />
+
+              <!-- Dormitory info -->
+              <div class="card form-card">
+                <h3 class="form-card__title">
+                  <img src="icons/building-office.svg" class="icon icon--title" alt="dormitory"> Dormitory Info
+                </h3>
+                <div class="field-group">
+                  <label class="field-label">Dormitory Name</label>
+                  <input type="text" class="field-input" [(ngModel)]="adminProfile.dormitory_name" />
+                </div>
+                <div class="field-group" style="margin-top:0.85rem">
+                  <label class="field-label">Address</label>
+                  <input type="text" class="field-input" [(ngModel)]="adminProfile.address" />
+                </div>
+                <div class="field-group" style="margin-top:0.85rem">
+                  <label class="field-label">Contact Email</label>
+                  <input type="email" class="field-input" [(ngModel)]="adminProfile.contact_email" />
+                </div>
+                <div class="field-group" style="margin-top:0.85rem">
+                  <label class="field-label">Contact Phone</label>
+                  <input type="text" class="field-input" [(ngModel)]="adminProfile.contact_phone" />
+                </div>
+                <div class="field-group" style="margin-top:0.85rem">
+                  <label class="field-label">Max Capacity (rooms)</label>
+                  <input type="number" class="field-input" [(ngModel)]="adminProfile.max_capacity" min="1" />
+                </div>
               </div>
             </div>
 
-            <!-- Notification settings -->
-            <div class="card form-card">
-              <h3 class="form-card__title">🔔 Notifications</h3>
+            <!-- Notification toggles (local preference) -->
+            <div class="card form-card" style="margin-top:1.25rem">
+              <h3 class="form-card__title">
+                <img src="icons/bell.svg" class="icon icon--title" alt="notifications"> Notification Preferences
+              </h3>
               <div class="toggle-row">
                 <div>
                   <strong class="toggle-label">Email Notifications</strong>
                   <p class="toggle-desc">Send email alerts for important events</p>
                 </div>
                 <label class="toggle">
-                  <input type="checkbox" [(ngModel)]="settings.notifications" />
+                  <input type="checkbox" [(ngModel)]="notifSettings.notifications" />
                   <span class="toggle__slider"></span>
                 </label>
               </div>
@@ -661,7 +760,7 @@
                   <p class="toggle-desc">Auto-remind residents before rent is due</p>
                 </div>
                 <label class="toggle">
-                  <input type="checkbox" [(ngModel)]="settings.autoReminders" />
+                  <input type="checkbox" [(ngModel)]="notifSettings.autoReminders" />
                   <span class="toggle__slider"></span>
                 </label>
               </div>
@@ -671,16 +770,18 @@
                   <p class="toggle-desc">Notify admin of new maintenance complaints</p>
                 </div>
                 <label class="toggle">
-                  <input type="checkbox" [(ngModel)]="settings.maintenanceAlerts" />
+                  <input type="checkbox" [(ngModel)]="notifSettings.maintenanceAlerts" />
                   <span class="toggle__slider"></span>
                 </label>
               </div>
             </div>
-          </div>
 
-          <div style="margin-top:1.25rem; display:flex; justify-content:flex-end">
-            <button class="btn-primary" (click)="saveSettings()">💾 Save Settings</button>
-          </div>
+            <div style="margin-top:1.25rem; display:flex; justify-content:flex-end">
+              <button class="btn-primary" (click)="saveAdminProfile()">
+                <img src="icons/save.svg" class="icon icon--btn" alt="save"> Save Profile
+              </button>
+            </div>
+          }
         </div>
       }
 
