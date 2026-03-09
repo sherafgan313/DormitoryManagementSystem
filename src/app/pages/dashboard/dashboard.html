@@ -356,7 +356,7 @@
                 </select>
               </div>
               <div class="field-group" style="margin-top:0.85rem">
-                <label class="field-label">Amount (₱)</label>
+                <label class="field-label">Amount (€)</label>
                 <input type="number" class="field-input" placeholder="e.g. 5000"
                        [(ngModel)]="paymentAmount" min="1" />
               </div>
@@ -380,11 +380,11 @@
               </div>
               <div class="summary-row">
                 <span class="summary-label">Paid this month</span>
-                <span class="summary-value summary-value--success">₱22,500</span>
+                <span class="summary-value summary-value--success">€22,500</span>
               </div>
               <div class="summary-row">
                 <span class="summary-label">Outstanding</span>
-                <span class="summary-value summary-value--danger">₱45,200</span>
+                <span class="summary-value summary-value--danger">€45,200</span>
               </div>
               <div class="summary-row">
                 <span class="summary-label">Overdue residents</span>
@@ -425,7 +425,7 @@
                       <td class="td-mono">#{{ p.payment_id }}</td>
                       <td><span class="td-name">{{ p.user_name ?? 'User ' + p.user_id }}</span></td>
                       <td>{{ p.month }}</td>
-                      <td class="td-amount">₱{{ p.amount | number:'1.2-2' }}</td>
+                      <td class="td-amount">€{{ p.amount | number:'1.2-2' }}</td>
                       <td class="td-muted">{{ p.created_at | date:'short' }}</td>
                     </tr>
                   } @empty {
@@ -607,7 +607,7 @@
                   <img src="icons/credit-card.svg" class="icon info-icon" alt="payments">
                   <div>
                     <strong>Payments</strong>
-                    <p>13 pending — ₱45,200 outstanding</p>
+                    <p>13 pending — €45,200 outstanding</p>
                   </div>
                 </div>
                 <div class="info-row">

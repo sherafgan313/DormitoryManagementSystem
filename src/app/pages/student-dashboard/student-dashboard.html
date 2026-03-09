@@ -106,7 +106,7 @@
             </span>
             <div>
               <strong>Rent due in {{ nextPayment.daysLeft }} days</strong>
-              <p>₱{{ nextPayment.amount | number }} for {{ nextPayment.month }} — due {{ nextPayment.dueDate }}</p>
+              <p>€{{ nextPayment.amount | number }} for {{ nextPayment.month }} — due {{ nextPayment.dueDate }}</p>
             </div>
           </div>
           <button class="btn-primary" (click)="navigateTo('payments')">Pay Now</button>
@@ -392,7 +392,7 @@
                     <img src="icons/credit-card.svg" class="icon icon--sm" alt="rent"> Monthly Rent
                   </span>
                   <span class="contract-detail-value contract-detail-value--amount">
-                    ₱{{ contractInfo.monthlyRent | number }}
+                    €{{ contractInfo.monthlyRent | number }}
                   </span>
                 </div>
                 <div class="contract-detail-row">
@@ -525,7 +525,7 @@
                 </select>
               </div>
               <div class="field-group" style="margin-top: 0.85rem">
-                <label class="field-label">Amount (₱)</label>
+                <label class="field-label">Amount (€)</label>
                 <input type="number" class="field-input" placeholder="e.g. 5000"
                        [(ngModel)]="paymentAmount" min="1" />
               </div>
@@ -549,11 +549,11 @@
               </div>
               <div class="summary-row">
                 <span class="summary-label">Monthly Rent</span>
-                <span class="summary-value">₱{{ contractInfo.monthlyRent | number }}</span>
+                <span class="summary-value">€{{ contractInfo.monthlyRent | number }}</span>
               </div>
               <div class="summary-row">
                 <span class="summary-label">Last Payment</span>
-                <span class="summary-value summary-value--success">₱5,000 (Feb)</span>
+                <span class="summary-value summary-value--success">€5,000 (Feb)</span>
               </div>
               <div class="summary-row">
                 <span class="summary-label">Next Due</span>
@@ -561,7 +561,7 @@
               </div>
               <div class="summary-row">
                 <span class="summary-label">Balance</span>
-                <span class="summary-value summary-value--danger">₱5,000 outstanding</span>
+                <span class="summary-value summary-value--danger">€5,000 outstanding</span>
               </div>
               <div class="summary-row">
                 <span class="summary-label">Status</span>
@@ -604,7 +604,7 @@
                     <tr>
                       <td class="td-mono">#{{ p.payment_id }}</td>
                       <td>{{ p.month }}</td>
-                      <td class="td-amount">₱{{ p.amount | number:'1.2-2' }}</td>
+                      <td class="td-amount">€{{ p.amount | number:'1.2-2' }}</td>
                       <td class="td-muted">{{ p.created_at | date:'short' }}</td>
                     </tr>
                   } @empty {

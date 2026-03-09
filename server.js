@@ -36,44 +36,28 @@ async function seedDemoData() {
 
     console.log("Seeding demo data...");
 
-    // ── 1. Dormitories ────────────────────────────────────────────────────────
+    // ── 1. Dormitory ─────────────────────────────────────────────────────────
     const [d1] = await dbp.query(
       "INSERT INTO dormitories (name, address, contact_email, contact_phone, max_capacity) VALUES (?,?,?,?,?)",
       ["Sunrise Dormitory", "123 University Ave, Manila", "admin@dms.com", "+63 912 000 1001", 32]
     );
     const dorm1Id = d1.insertId;
 
-    const [d2] = await dbp.query(
-      "INSERT INTO dormitories (name, address, contact_email, contact_phone, max_capacity) VALUES (?,?,?,?,?)",
-      ["Moonlight Dormitory", "456 College Road, Cebu", "admin2@dms.com", "+63 912 000 2002", 32]
-    );
-    const dorm2Id = d2.insertId;
-
-    // ── 2. Admin users ────────────────────────────────────────────────────────
+    // ── 2. Admin user ─────────────────────────────────────────────────────────
     const adminHash = await bcrypt.hash("admin123", 10);
 
     const [a1] = await dbp.query(
-      "INSERT INTO users (name, email, password_hash, role, dormitory_id) VALUES (?,?,?,?,?)",
-      ["Admin User", "admin@dms.com", adminHash, "ADMIN", dorm1Id]
+      "INSERT INTO users (name, email, password_hash, role) VALUES (?,?,?,?)",
+      ["Admin User", "admin@dms.com", adminHash, "ADMIN"]
     );
     const admin1Id = a1.insertId;
-
-    const [a2] = await dbp.query(
-      "INSERT INTO users (name, email, password_hash, role, dormitory_id) VALUES (?,?,?,?,?)",
-      ["Admin User 2", "admin2@dms.com", adminHash, "ADMIN", dorm2Id]
-    );
-    const admin2Id = a2.insertId;
 
     await dbp.query(
       "INSERT INTO admin_profiles (user_id, dormitory_id, position, phone) VALUES (?,?,?,?)",
       [admin1Id, dorm1Id, "Dormitory Administrator", "+63 912 000 1001"]
     );
-    await dbp.query(
-      "INSERT INTO admin_profiles (user_id, dormitory_id, position, phone) VALUES (?,?,?,?)",
-      [admin2Id, dorm2Id, "Dormitory Administrator", "+63 912 000 2002"]
-    );
 
-    // ── 3. Rooms for dorm 1 (32 rooms, 4 floors × 8) ─────────────────────────
+    // ── 3. Rooms (32 rooms, 4 floors × 8) ────────────────────────────────────
     const roomTypes = ["Single", "Single", "Double", "Double", "Single", "Double", "Suite", "Double"];
     const room1Ids  = [];
 
@@ -81,8 +65,8 @@ async function seedDemoData() {
       for (let r = 1; r <= 8; r++) {
         const roomNum = `${floor}0${r}`;
         const [rRow] = await dbp.query(
-          "INSERT INTO rooms (dormitory_id, room_number, floor, type) VALUES (?,?,?,?)",
-          [dorm1Id, roomNum, floor, roomTypes[r - 1]]
+          "INSERT INTO rooms (room_number, floor, type) VALUES (?,?,?)",
+          [roomNum, floor, roomTypes[r - 1]]
         );
         room1Ids.push(rRow.insertId);
       }
@@ -92,18 +76,7 @@ async function seedDemoData() {
     await dbp.query("UPDATE rooms SET status = 'maintenance' WHERE room_id = ?", [room1Ids[6]]);
     await dbp.query("UPDATE rooms SET status = 'maintenance' WHERE room_id = ?", [room1Ids[23]]);
 
-    // ── 4. Rooms for dorm 2 (32 rooms) ───────────────────────────────────────
-    for (let floor = 1; floor <= 4; floor++) {
-      for (let r = 1; r <= 8; r++) {
-        const roomNum = `${floor}0${r}`;
-        await dbp.query(
-          "INSERT INTO rooms (dormitory_id, room_number, floor, type) VALUES (?,?,?,?)",
-          [dorm2Id, roomNum, floor, roomTypes[r - 1]]
-        );
-      }
-    }
-
-    // ── 5. Student users ──────────────────────────────────────────────────────
+    // ── 4. Student users ──────────────────────────────────────────────────────
     const studentHash = await bcrypt.hash("student123", 10);
 
     const studentData = [
@@ -123,7 +96,7 @@ async function seedDemoData() {
       students.push({ id: sRow.insertId, ...s });
     }
 
-    // ── 6. Accept first 3 students → assign rooms 101, 102, 103 ──────────────
+    // ── 5. Accept first 3 students → assign rooms 101, 102, 103 ──────────────
     const acceptedRoomIds  = [room1Ids[0], room1Ids[1], room1Ids[2]];
     const acceptedStudents = students.slice(0, 3);
 
@@ -132,19 +105,18 @@ async function seedDemoData() {
       const roomId = acceptedRoomIds[i];
 
       await dbp.query("UPDATE rooms SET status = 'occupied', resident_id = ? WHERE room_id = ?", [s.id, roomId]);
-      await dbp.query("UPDATE users SET dormitory_id = ? WHERE user_id = ?", [dorm1Id, s.id]);
 
       await dbp.query(
-        "INSERT INTO student_profiles (user_id, dormitory_id, room_id, phone, student_id_number, course, university, application_status) VALUES (?,?,?,?,?,?,?,?)",
-        [s.id, dorm1Id, roomId, s.phone, s.sid, s.course, s.uni, "ACCEPTED"]
+        "INSERT INTO student_profiles (user_id, room_id, phone, student_id_number, course, university, application_status) VALUES (?,?,?,?,?,?,?)",
+        [s.id, roomId, s.phone, s.sid, s.course, s.uni, "ACCEPTED"]
       );
       await dbp.query(
-        "INSERT INTO dorm_applications (user_id, dormitory_id, submission_date, status, assigned_room_id) VALUES (?,?,?,?,?)",
-        [s.id, dorm1Id, "2025-12-01", "ACCEPTED", roomId]
+        "INSERT INTO dorm_applications (user_id, submission_date, status, assigned_room_id) VALUES (?,?,?,?)",
+        [s.id, "2025-12-01", "ACCEPTED", roomId]
       );
       await dbp.query(
-        "INSERT INTO contracts (user_id, dormitory_id, room_id, start_date, end_date, status) VALUES (?,?,?,?,?,?)",
-        [s.id, dorm1Id, roomId, "2026-01-15", "2026-12-15", "ACTIVE"]
+        "INSERT INTO contracts (user_id, room_id, start_date, end_date, status) VALUES (?,?,?,?,?)",
+        [s.id, roomId, "2026-01-15", "2026-12-15", "ACTIVE"]
       );
     }
 
@@ -156,7 +128,7 @@ async function seedDemoData() {
       );
     }
 
-    // ── 7. Seed complaints ────────────────────────────────────────────────────
+    // ── 6. Seed complaints ────────────────────────────────────────────────────
     const complaintsData = [
       { uid: acceptedStudents[0].id, desc: "AC unit in room 101 is not cooling and makes loud noise at night.", status: "SUBMITTED"    },
       { uid: acceptedStudents[1].id, desc: "Water leak detected in the bathroom ceiling of room 102.",          status: "IN_PROGRESS"  },
@@ -164,12 +136,12 @@ async function seedDemoData() {
     ];
     for (const c of complaintsData) {
       await dbp.query(
-        "INSERT INTO complaints (user_id, dormitory_id, description, status) VALUES (?,?,?,?)",
-        [c.uid, dorm1Id, c.desc, c.status]
+        "INSERT INTO complaints (user_id, description, status) VALUES (?,?,?)",
+        [c.uid, c.desc, c.status]
       );
     }
 
-    // ── 8. Seed payments ──────────────────────────────────────────────────────
+    // ── 7. Seed payments ──────────────────────────────────────────────────────
     const paymentsData = [
       { uid: acceptedStudents[0].id, month: "Jan", amount: 5000 },
       { uid: acceptedStudents[0].id, month: "Feb", amount: 5000 },
@@ -179,16 +151,15 @@ async function seedDemoData() {
     ];
     for (const p of paymentsData) {
       await dbp.query(
-        "INSERT INTO rent_payments (user_id, dormitory_id, month, amount) VALUES (?,?,?,?)",
-        [p.uid, dorm1Id, p.month, p.amount]
+        "INSERT INTO rent_payments (user_id, month, amount) VALUES (?,?,?)",
+        [p.uid, p.month, p.amount]
       );
     }
 
     console.log("─────────────────────────────────────────────");
     console.log("Demo data seeded successfully!");
     console.log("  Admin:   admin@dms.com   / admin123  → Sunrise Dormitory");
-    console.log("  Admin:   admin2@dms.com  / admin123  → Moonlight Dormitory");
-    console.log("  Student: student@dms.com / student123 (Room 101, Sunrise)");
+    console.log("  Student: student@dms.com / student123 (Room 101)");
     console.log("  + 4 more demo students (juan, ana, pedro, rosa @dms.com / student123)");
     console.log("─────────────────────────────────────────────");
   } catch (err) {
@@ -205,7 +176,7 @@ function authMiddleware(req, res, next) {
 
   jwt.verify(token, SECRET, (err, decoded) => {
     if (err) return res.status(403).json({ message: "Invalid or expired token" });
-    req.user = decoded; // { id, role, dormitory_id }
+    req.user = decoded; // { id, role }
     next();
   });
 }
@@ -259,18 +230,17 @@ app.post("/api/login", (req, res) => {
     if (!match) return res.status(401).json({ message: "Invalid credentials" });
 
     const token = jwt.sign(
-      { id: user.user_id, role: user.role, dormitory_id: user.dormitory_id },
+      { id: user.user_id, role: user.role },
       SECRET,
       { expiresIn: "1d" }
     );
 
     res.json({
       token,
-      role:         user.role,
-      userId:       user.user_id,
-      name:         user.name,
-      email:        user.email,
-      dormitory_id: user.dormitory_id,
+      role:   user.role,
+      userId: user.user_id,
+      name:   user.name,
+      email:  user.email,
     });
   });
 });
@@ -294,8 +264,7 @@ app.post("/api/applications", authMiddleware, (req, res) => {
   );
 });
 
-// ADMIN → pending (all) + accepted/rejected for their dorm
-// STUDENT → own applications only
+// ADMIN → all applications | STUDENT → own applications only
 app.get("/api/applications", authMiddleware, (req, res) => {
   if (req.user.role === "ADMIN") {
     const sql = `
@@ -304,9 +273,8 @@ app.get("/api/applications", authMiddleware, (req, res) => {
       FROM dorm_applications da
       LEFT JOIN users u ON da.user_id = u.user_id
       LEFT JOIN rooms r ON da.assigned_room_id = r.room_id
-      WHERE da.status = 'PENDING' OR da.dormitory_id = ?
       ORDER BY da.created_at DESC`;
-    db.query(sql, [req.user.dormitory_id], (err, rows) => {
+    db.query(sql, (err, rows) => {
       if (err) return res.status(500).json({ message: "Failed to load applications" });
       res.json(rows);
     });
@@ -325,8 +293,7 @@ app.get("/api/applications", authMiddleware, (req, res) => {
 // ADMIN only — accept (requires room_id) or reject an application
 app.patch("/api/applications/:id/status", authMiddleware, requireRole("ADMIN"), async (req, res) => {
   const { status, room_id } = req.body;
-  const appId      = req.params.id;
-  const dormitory_id = req.user.dormitory_id;
+  const appId = req.params.id;
 
   const allowed = ["PENDING", "ACCEPTED", "REJECTED"];
   if (!allowed.includes(status))
@@ -349,39 +316,35 @@ app.patch("/api/applications/:id/status", authMiddleware, requireRole("ADMIN"), 
     const userId = apps[0].user_id;
 
     if (status === "ACCEPTED") {
-      // Mark room as occupied (fails if room not vacant or not in this dorm)
+      // Mark room as occupied (fails if room not vacant)
       const [roomResult] = await dbp.query(
-        "UPDATE rooms SET status = 'occupied', resident_id = ? WHERE room_id = ? AND dormitory_id = ? AND status = 'vacant'",
-        [userId, room_id, dormitory_id]
+        "UPDATE rooms SET status = 'occupied', resident_id = ? WHERE room_id = ? AND status = 'vacant'",
+        [userId, room_id]
       );
       if (!roomResult.affectedRows) {
         await dbp.query("ROLLBACK");
-        return res.status(400).json({ message: "Room is not available or does not belong to your dormitory" });
+        return res.status(400).json({ message: "Room is not available" });
       }
 
-      // Link student to this dormitory
-      await dbp.query("UPDATE users SET dormitory_id = ? WHERE user_id = ?", [dormitory_id, userId]);
-
-      // Upsert student_profiles with room and dorm
+      // Upsert student_profiles with assigned room
       await dbp.query(
-        `INSERT INTO student_profiles (user_id, dormitory_id, room_id, application_status)
-         VALUES (?, ?, ?, 'ACCEPTED')
-         ON DUPLICATE KEY UPDATE dormitory_id = VALUES(dormitory_id),
-                                 room_id = VALUES(room_id),
+        `INSERT INTO student_profiles (user_id, room_id, application_status)
+         VALUES (?, ?, 'ACCEPTED')
+         ON DUPLICATE KEY UPDATE room_id = VALUES(room_id),
                                  application_status = 'ACCEPTED'`,
-        [userId, dormitory_id, room_id]
+        [userId, room_id]
       );
 
       // Update application
       await dbp.query(
-        "UPDATE dorm_applications SET status = 'ACCEPTED', dormitory_id = ?, assigned_room_id = ? WHERE application_id = ?",
-        [dormitory_id, room_id, appId]
+        "UPDATE dorm_applications SET status = 'ACCEPTED', assigned_room_id = ? WHERE application_id = ?",
+        [room_id, appId]
       );
     } else {
       // REJECTED or PENDING
       await dbp.query(
-        "UPDATE dorm_applications SET status = ?, dormitory_id = ? WHERE application_id = ?",
-        [status, dormitory_id, appId]
+        "UPDATE dorm_applications SET status = ? WHERE application_id = ?",
+        [status, appId]
       );
     }
 
@@ -397,15 +360,14 @@ app.patch("/api/applications/:id/status", authMiddleware, requireRole("ADMIN"), 
 
 // ─── ROOMS (admin only) ───────────────────────────────────────────────────────
 
-// All rooms in the admin's dormitory
+// All rooms in the dormitory
 app.get("/api/rooms", authMiddleware, requireRole("ADMIN"), (req, res) => {
   const sql = `
     SELECT r.*, u.name AS resident_name
     FROM rooms r
     LEFT JOIN users u ON r.resident_id = u.user_id
-    WHERE r.dormitory_id = ?
     ORDER BY r.floor, r.room_number`;
-  db.query(sql, [req.user.dormitory_id], (err, rows) => {
+  db.query(sql, (err, rows) => {
     if (err) return res.status(500).json({ message: "Failed to load rooms" });
     res.json(rows);
   });
@@ -414,8 +376,7 @@ app.get("/api/rooms", authMiddleware, requireRole("ADMIN"), (req, res) => {
 // Only vacant rooms (for room assignment on application acceptance)
 app.get("/api/rooms/vacant", authMiddleware, requireRole("ADMIN"), (req, res) => {
   db.query(
-    "SELECT room_id, room_number, floor, type FROM rooms WHERE dormitory_id = ? AND status = 'vacant' ORDER BY floor, room_number",
-    [req.user.dormitory_id],
+    "SELECT room_id, room_number, floor, type FROM rooms WHERE status = 'vacant' ORDER BY floor, room_number",
     (err, rows) => {
       if (err) return res.status(500).json({ message: "Failed to load vacant rooms" });
       res.json(rows);
@@ -432,8 +393,8 @@ app.post("/api/contracts", authMiddleware, requireRole("ADMIN"), (req, res) => {
     return res.status(400).json({ message: "user_id, start_date and end_date are required" });
 
   db.query(
-    "INSERT INTO contracts (user_id, dormitory_id, start_date, end_date, status) VALUES (?, ?, ?, ?, ?)",
-    [user_id, req.user.dormitory_id, start_date, end_date, status],
+    "INSERT INTO contracts (user_id, start_date, end_date, status) VALUES (?, ?, ?, ?)",
+    [user_id, start_date, end_date, status],
     (err) => {
       if (err) {
         if (err.code === "ER_DUP_ENTRY")
@@ -445,7 +406,7 @@ app.post("/api/contracts", authMiddleware, requireRole("ADMIN"), (req, res) => {
   );
 });
 
-// ADMIN → dorm's contracts | STUDENT → own contract
+// ADMIN → all contracts | STUDENT → own contract
 app.get("/api/contracts", authMiddleware, (req, res) => {
   if (req.user.role === "ADMIN") {
     const sql = `
@@ -454,9 +415,8 @@ app.get("/api/contracts", authMiddleware, (req, res) => {
       FROM contracts c
       LEFT JOIN users u ON c.user_id = u.user_id
       LEFT JOIN rooms r ON c.room_id = r.room_id
-      WHERE c.dormitory_id = ?
       ORDER BY c.contract_id DESC`;
-    db.query(sql, [req.user.dormitory_id], (err, rows) => {
+    db.query(sql, (err, rows) => {
       if (err) return res.status(500).json({ message: "Failed to load contracts" });
       res.json(rows);
     });
@@ -499,8 +459,8 @@ app.post("/api/complaints", authMiddleware, (req, res) => {
     return res.status(400).json({ message: "description is required" });
 
   db.query(
-    "INSERT INTO complaints (user_id, dormitory_id, description) VALUES (?, ?, ?)",
-    [req.user.id, req.user.dormitory_id ?? null, description],
+    "INSERT INTO complaints (user_id, description) VALUES (?, ?)",
+    [req.user.id, description],
     (err) => {
       if (err) return res.status(500).json({ message: "Failed to submit complaint" });
       res.json({ message: "Complaint submitted" });
@@ -508,16 +468,15 @@ app.post("/api/complaints", authMiddleware, (req, res) => {
   );
 });
 
-// ADMIN → dorm's complaints | STUDENT → own complaints
+// ADMIN → all complaints | STUDENT → own complaints
 app.get("/api/complaints", authMiddleware, (req, res) => {
   if (req.user.role === "ADMIN") {
     const sql = `
       SELECT c.*, u.name AS user_name, u.email AS user_email
       FROM complaints c
       LEFT JOIN users u ON c.user_id = u.user_id
-      WHERE c.dormitory_id = ?
       ORDER BY c.created_at DESC`;
-    db.query(sql, [req.user.dormitory_id], (err, rows) => {
+    db.query(sql, (err, rows) => {
       if (err) return res.status(500).json({ message: "Failed to load complaints" });
       res.json(rows);
     });
@@ -559,8 +518,8 @@ app.post("/api/payments", authMiddleware, (req, res) => {
     return res.status(400).json({ message: "month and amount are required" });
 
   db.query(
-    "INSERT INTO rent_payments (user_id, dormitory_id, month, amount) VALUES (?, ?, ?, ?)",
-    [req.user.id, req.user.dormitory_id ?? null, month, amount],
+    "INSERT INTO rent_payments (user_id, month, amount) VALUES (?, ?, ?)",
+    [req.user.id, month, amount],
     (err) => {
       if (err) return res.status(500).json({ message: "Failed to record payment" });
       res.json({ message: "Payment recorded" });
@@ -568,16 +527,15 @@ app.post("/api/payments", authMiddleware, (req, res) => {
   );
 });
 
-// ADMIN → dorm's payments | STUDENT → own payments
+// ADMIN → all payments | STUDENT → own payments
 app.get("/api/payments", authMiddleware, (req, res) => {
   if (req.user.role === "ADMIN") {
     const sql = `
       SELECT rp.*, u.name AS user_name, u.email AS user_email
       FROM rent_payments rp
       LEFT JOIN users u ON rp.user_id = u.user_id
-      WHERE rp.dormitory_id = ?
       ORDER BY rp.created_at DESC`;
-    db.query(sql, [req.user.dormitory_id], (err, rows) => {
+    db.query(sql, (err, rows) => {
       if (err) return res.status(500).json({ message: "Failed to load payments" });
       res.json(rows);
     });
@@ -598,8 +556,8 @@ app.get("/api/payments", authMiddleware, (req, res) => {
 
 app.post("/api/reports", authMiddleware, (req, res) => {
   db.query(
-    "INSERT INTO reports (generated_by, dormitory_id, file_path) VALUES (?, ?, ?)",
-    [req.user.id, req.user.dormitory_id ?? null, "reports/sample.pdf"],
+    "INSERT INTO reports (generated_by, file_path) VALUES (?, ?)",
+    [req.user.id, "reports/sample.pdf"],
     (err) => {
       if (err) return res.status(500).json({ message: "Failed to generate report" });
       res.json({ message: "Report generated" });
@@ -607,16 +565,15 @@ app.post("/api/reports", authMiddleware, (req, res) => {
   );
 });
 
-// ADMIN → dorm's reports | STUDENT → own reports
+// ADMIN → all reports | STUDENT → own reports
 app.get("/api/reports", authMiddleware, (req, res) => {
   if (req.user.role === "ADMIN") {
     const sql = `
       SELECT r.*, u.name AS generated_by_name
       FROM reports r
       LEFT JOIN users u ON r.generated_by = u.user_id
-      WHERE r.dormitory_id = ?
       ORDER BY r.generation_date DESC`;
-    db.query(sql, [req.user.dormitory_id], (err, rows) => {
+    db.query(sql, (err, rows) => {
       if (err) return res.status(500).json({ message: "Failed to load reports" });
       res.json(rows);
     });
@@ -670,10 +627,10 @@ app.put("/api/admin/profile", authMiddleware, requireRole("ADMIN"), async (req, 
       [position ?? "Dormitory Administrator", phone ?? null, req.user.id]
     );
 
-    // Update dormitories
+    // Update dormitories via the admin's profile link
     await dbp.query(
-      "UPDATE dormitories SET name = ?, address = ?, contact_email = ?, contact_phone = ?, max_capacity = ? WHERE dormitory_id = ?",
-      [dormitory_name, address ?? null, contact_email ?? null, contact_phone ?? null, max_capacity ?? 50, req.user.dormitory_id]
+      "UPDATE dormitories SET name = ?, address = ?, contact_email = ?, contact_phone = ?, max_capacity = ? WHERE dormitory_id = (SELECT dormitory_id FROM admin_profiles WHERE user_id = ?)",
+      [dormitory_name, address ?? null, contact_email ?? null, contact_phone ?? null, max_capacity ?? 50, req.user.id]
     );
 
     res.json({ message: "Admin profile updated" });
@@ -688,29 +645,25 @@ app.put("/api/admin/profile", authMiddleware, requireRole("ADMIN"), async (req, 
 // ─── ACTIVITY FEED (admin only) ───────────────────────────────────────────────
 
 app.get("/api/activity", authMiddleware, requireRole("ADMIN"), (req, res) => {
-  const dormId = req.user.dormitory_id;
   const sql = `
     (SELECT 'application' AS type, da.application_id AS ref_id,
             u.name AS actor, da.status AS detail, da.created_at
      FROM dorm_applications da
-     LEFT JOIN users u ON da.user_id = u.user_id
-     WHERE da.dormitory_id = ?)
+     LEFT JOIN users u ON da.user_id = u.user_id)
     UNION ALL
     (SELECT 'complaint' AS type, c.complaint_id,
             u.name, c.status, c.created_at
      FROM complaints c
-     LEFT JOIN users u ON c.user_id = u.user_id
-     WHERE c.dormitory_id = ?)
+     LEFT JOIN users u ON c.user_id = u.user_id)
     UNION ALL
     (SELECT 'payment' AS type, rp.payment_id,
             u.name, rp.month, rp.created_at
      FROM rent_payments rp
-     LEFT JOIN users u ON rp.user_id = u.user_id
-     WHERE rp.dormitory_id = ?)
+     LEFT JOIN users u ON rp.user_id = u.user_id)
     ORDER BY created_at DESC
     LIMIT 10`;
 
-  db.query(sql, [dormId, dormId, dormId], (err, rows) => {
+  db.query(sql, (err, rows) => {
     if (err) return res.status(500).json({ message: "Failed to load activity" });
     res.json(rows);
   });
@@ -730,7 +683,7 @@ app.get("/api/profile", authMiddleware, requireRole("STUDENT"), (req, res) => {
            r.room_number, r.floor, r.type AS room_type
     FROM users u
     LEFT JOIN student_profiles sp ON u.user_id = sp.user_id
-    LEFT JOIN dormitories d ON sp.dormitory_id = d.dormitory_id
+    LEFT JOIN dormitories d ON d.dormitory_id = 1
     LEFT JOIN rooms r ON sp.room_id = r.room_id
     WHERE u.user_id = ?`;
 
@@ -779,10 +732,10 @@ app.get("/api/users", authMiddleware, requireRole("ADMIN"), (req, res) => {
     FROM users u
     LEFT JOIN student_profiles sp ON u.user_id = sp.user_id
     LEFT JOIN rooms r ON sp.room_id = r.room_id
-    WHERE u.role = 'STUDENT' AND u.dormitory_id = ?
+    WHERE u.role = 'STUDENT'
     ORDER BY u.created_at DESC`;
 
-  db.query(sql, [req.user.dormitory_id], (err, rows) => {
+  db.query(sql, (err, rows) => {
     if (err) return res.status(500).json({ message: "Failed to load users" });
     res.json(rows);
   });
@@ -792,18 +745,16 @@ app.get("/api/users", authMiddleware, requireRole("ADMIN"), (req, res) => {
 // ─── STATS (admin only) ───────────────────────────────────────────────────────
 
 app.get("/api/stats", authMiddleware, requireRole("ADMIN"), (req, res) => {
-  const dormId = req.user.dormitory_id;
-
   const queries = {
-    totalRooms:          ["SELECT COUNT(*) AS v FROM rooms WHERE dormitory_id = ?",                                    dormId],
-    occupiedRooms:       ["SELECT COUNT(*) AS v FROM rooms WHERE dormitory_id = ? AND status = 'occupied'",            dormId],
-    vacantRooms:         ["SELECT COUNT(*) AS v FROM rooms WHERE dormitory_id = ? AND status = 'vacant'",              dormId],
-    maintenanceRooms:    ["SELECT COUNT(*) AS v FROM rooms WHERE dormitory_id = ? AND status = 'maintenance'",         dormId],
-    totalStudents:       ["SELECT COUNT(*) AS v FROM users WHERE role = 'STUDENT' AND dormitory_id = ?",               dormId],
-    pendingApplications: ["SELECT COUNT(*) AS v FROM dorm_applications WHERE status = 'PENDING'",                      null],
-    openComplaints:      ["SELECT COUNT(*) AS v FROM complaints WHERE dormitory_id = ? AND status != 'RESOLVED'",      dormId],
-    activeContracts:     ["SELECT COUNT(*) AS v FROM contracts WHERE dormitory_id = ? AND status = 'ACTIVE'",          dormId],
-    totalPayments:       ["SELECT COUNT(*) AS v FROM rent_payments WHERE dormitory_id = ?",                            dormId],
+    totalRooms:          "SELECT COUNT(*) AS v FROM rooms",
+    occupiedRooms:       "SELECT COUNT(*) AS v FROM rooms WHERE status = 'occupied'",
+    vacantRooms:         "SELECT COUNT(*) AS v FROM rooms WHERE status = 'vacant'",
+    maintenanceRooms:    "SELECT COUNT(*) AS v FROM rooms WHERE status = 'maintenance'",
+    totalStudents:       "SELECT COUNT(*) AS v FROM users WHERE role = 'STUDENT'",
+    pendingApplications: "SELECT COUNT(*) AS v FROM dorm_applications WHERE status = 'PENDING'",
+    openComplaints:      "SELECT COUNT(*) AS v FROM complaints WHERE status != 'RESOLVED'",
+    activeContracts:     "SELECT COUNT(*) AS v FROM contracts WHERE status = 'ACTIVE'",
+    totalPayments:       "SELECT COUNT(*) AS v FROM rent_payments",
   };
 
   const keys    = Object.keys(queries);
@@ -811,9 +762,7 @@ app.get("/api/stats", authMiddleware, requireRole("ADMIN"), (req, res) => {
   let   done    = 0;
 
   keys.forEach((key) => {
-    const [sql, param] = queries[key];
-    const params = param !== null ? [param] : [];
-    db.query(sql, params, (err, rows) => {
+    db.query(queries[key], (err, rows) => {
       results[key] = err ? 0 : rows[0].v;
       if (++done === keys.length) res.json(results);
     });
