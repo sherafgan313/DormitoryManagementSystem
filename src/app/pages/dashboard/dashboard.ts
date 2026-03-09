@@ -34,7 +34,6 @@ interface Room {
 interface Application {
   application_id: number;
   user_id: number;
-  dormitory_id: number | null;
   submission_date: string;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
   assigned_room_id: number | null;
@@ -445,7 +444,7 @@ export class DashboardComponent implements OnInit {
     this.api.recordPayment(this.paymentMonth, this.paymentAmount).subscribe({
       next: () => {
         const amt = this.paymentAmount?.toLocaleString();
-        this.paymentMsg     = `Payment of ₱${amt} for ${this.paymentMonth} recorded!`;
+        this.paymentMsg     = `Payment of €${amt} for ${this.paymentMonth} recorded!`;
         this.paymentErr     = false;
         this.paymentMonth   = '';
         this.paymentAmount  = null;

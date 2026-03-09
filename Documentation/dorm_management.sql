@@ -1,5 +1,5 @@
--- Dormitory Management System — Database Schema v2.0
--- Multi-dormitory support with admin profiles and room assignment
+-- Dormitory Management System — Database Schema
+-- Single dormitory with admin profiles and room assignment
 --
 -- USAGE: mysql -u root dorm_management < Documentation/dorm_management.sql
 -- After importing, start server.js — it will seed all demo data automatically.
@@ -54,9 +54,6 @@ CREATE TABLE `file_metadata` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- ─── USERS ───────────────────────────────────────────────────────────────────
--- dormitory_id links the user to their assigned dormitory.
--- For ADMINs it is set immediately on account creation.
--- For STUDENTs it is set when their application is accepted and a room is assigned.
 
 CREATE TABLE `users` (
   `user_id`       int NOT NULL AUTO_INCREMENT,
@@ -64,31 +61,26 @@ CREATE TABLE `users` (
   `email`         varchar(150) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `role`          enum('STUDENT','ADMIN') NOT NULL,
-  `dormitory_id`  int DEFAULT NULL,
   `created_at`    timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`user_id`),
-  UNIQUE KEY `email` (`email`),
-  KEY `dormitory_id` (`dormitory_id`),
-  CONSTRAINT `users_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`)
+  UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- ─── ROOMS ───────────────────────────────────────────────────────────────────
--- Represents individual rooms within a dormitory.
+-- Represents individual rooms within the dormitory.
 -- resident_id is set when a room is assigned to a student.
 
 CREATE TABLE `rooms` (
-  `room_id`      int NOT NULL AUTO_INCREMENT,
-  `dormitory_id` int NOT NULL,
-  `room_number`  varchar(10) NOT NULL,
-  `floor`        int NOT NULL,
-  `type`         enum('Single','Double','Suite') NOT NULL DEFAULT 'Single',
-  `status`       enum('occupied','vacant','maintenance') NOT NULL DEFAULT 'vacant',
-  `resident_id`  int DEFAULT NULL,
+  `room_id`     int NOT NULL AUTO_INCREMENT,
+  `room_number` varchar(10) NOT NULL,
+  `floor`       int NOT NULL,
+  `type`        enum('Single','Double','Suite') NOT NULL DEFAULT 'Single',
+  `status`      enum('occupied','vacant','maintenance') NOT NULL DEFAULT 'vacant',
+  `resident_id` int DEFAULT NULL,
   PRIMARY KEY (`room_id`),
-  UNIQUE KEY `dorm_room_unique` (`dormitory_id`, `room_number`),
+  UNIQUE KEY `room_number_unique` (`room_number`),
   KEY `resident_id` (`resident_id`),
-  CONSTRAINT `rooms_dorm_fk`     FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`),
-  CONSTRAINT `rooms_resident_fk` FOREIGN KEY (`resident_id`)  REFERENCES `users` (`user_id`)
+  CONSTRAINT `rooms_resident_fk` FOREIGN KEY (`resident_id`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- ─── ADMIN PROFILES ──────────────────────────────────────────────────────────
@@ -110,12 +102,11 @@ CREATE TABLE `admin_profiles` (
 
 -- ─── STUDENT PROFILES ────────────────────────────────────────────────────────
 -- Extended profile for STUDENT users.
--- dormitory_id and room_id are set when the student is accepted.
+-- room_id is set when the student is accepted.
 
 CREATE TABLE `student_profiles` (
   `profile_id`        int NOT NULL AUTO_INCREMENT,
   `user_id`           int NOT NULL,
-  `dormitory_id`      int DEFAULT NULL,
   `room_id`           int DEFAULT NULL,
   `phone`             varchar(30)  DEFAULT NULL,
   `student_id_number` varchar(50)  DEFAULT NULL,
@@ -125,31 +116,25 @@ CREATE TABLE `student_profiles` (
   `application_status` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`profile_id`),
   UNIQUE KEY `user_id` (`user_id`),
-  KEY `dormitory_id` (`dormitory_id`),
   KEY `room_id` (`room_id`),
-  CONSTRAINT `student_profiles_user_fk` FOREIGN KEY (`user_id`)      REFERENCES `users` (`user_id`),
-  CONSTRAINT `student_profiles_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`),
-  CONSTRAINT `student_profiles_room_fk` FOREIGN KEY (`room_id`)      REFERENCES `rooms` (`room_id`)
+  CONSTRAINT `student_profiles_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `student_profiles_room_fk` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`room_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- ─── DORM APPLICATIONS ───────────────────────────────────────────────────────
--- dormitory_id is set when an admin accepts the application.
 -- assigned_room_id is set when a room is assigned on acceptance.
 
 CREATE TABLE `dorm_applications` (
   `application_id`  int NOT NULL AUTO_INCREMENT,
   `user_id`         int NOT NULL,
-  `dormitory_id`    int DEFAULT NULL,
   `submission_date` date DEFAULT NULL,
   `status`          enum('PENDING','ACCEPTED','REJECTED') NOT NULL DEFAULT 'PENDING',
   `assigned_room_id` int DEFAULT NULL,
   `created_at`      timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`application_id`),
   KEY `user_id` (`user_id`),
-  KEY `dormitory_id` (`dormitory_id`),
   KEY `assigned_room_id` (`assigned_room_id`),
   CONSTRAINT `dorm_apps_user_fk` FOREIGN KEY (`user_id`)          REFERENCES `users` (`user_id`),
-  CONSTRAINT `dorm_apps_dorm_fk` FOREIGN KEY (`dormitory_id`)     REFERENCES `dormitories` (`dormitory_id`),
   CONSTRAINT `dorm_apps_room_fk` FOREIGN KEY (`assigned_room_id`) REFERENCES `rooms` (`room_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -158,7 +143,6 @@ CREATE TABLE `dorm_applications` (
 CREATE TABLE `contracts` (
   `contract_id`            int NOT NULL AUTO_INCREMENT,
   `user_id`                int NOT NULL,
-  `dormitory_id`           int DEFAULT NULL,
   `room_id`                int DEFAULT NULL,
   `start_date`             date DEFAULT NULL,
   `end_date`               date DEFAULT NULL,
@@ -166,11 +150,9 @@ CREATE TABLE `contracts` (
   `signed_document_file_id` int DEFAULT NULL,
   PRIMARY KEY (`contract_id`),
   UNIQUE KEY `user_id` (`user_id`),
-  KEY `dormitory_id` (`dormitory_id`),
   KEY `room_id` (`room_id`),
-  CONSTRAINT `contracts_user_fk` FOREIGN KEY (`user_id`)      REFERENCES `users` (`user_id`),
-  CONSTRAINT `contracts_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`),
-  CONSTRAINT `contracts_room_fk` FOREIGN KEY (`room_id`)      REFERENCES `rooms` (`room_id`)
+  CONSTRAINT `contracts_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `contracts_room_fk` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`room_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- ─── COMPLAINTS ──────────────────────────────────────────────────────────────
@@ -178,15 +160,12 @@ CREATE TABLE `contracts` (
 CREATE TABLE `complaints` (
   `complaint_id` int NOT NULL AUTO_INCREMENT,
   `user_id`      int NOT NULL,
-  `dormitory_id` int DEFAULT NULL,
   `description`  text,
   `status`       enum('SUBMITTED','IN_PROGRESS','RESOLVED') NOT NULL DEFAULT 'SUBMITTED',
   `created_at`   timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`complaint_id`),
   KEY `user_id` (`user_id`),
-  KEY `dormitory_id` (`dormitory_id`),
-  CONSTRAINT `complaints_user_fk` FOREIGN KEY (`user_id`)      REFERENCES `users` (`user_id`),
-  CONSTRAINT `complaints_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`)
+  CONSTRAINT `complaints_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- ─── RENT PAYMENTS ───────────────────────────────────────────────────────────
@@ -194,16 +173,13 @@ CREATE TABLE `complaints` (
 CREATE TABLE `rent_payments` (
   `payment_id`     int NOT NULL AUTO_INCREMENT,
   `user_id`        int DEFAULT NULL,
-  `dormitory_id`   int DEFAULT NULL,
   `month`          varchar(20)    DEFAULT NULL,
   `amount`         decimal(10,2)  DEFAULT NULL,
   `receipt_file_id` int DEFAULT NULL,
   `created_at`     timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`payment_id`),
   KEY `user_id` (`user_id`),
-  KEY `dormitory_id` (`dormitory_id`),
-  CONSTRAINT `payments_user_fk` FOREIGN KEY (`user_id`)      REFERENCES `users` (`user_id`),
-  CONSTRAINT `payments_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`)
+  CONSTRAINT `payments_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- ─── REPORTS ─────────────────────────────────────────────────────────────────
@@ -211,14 +187,11 @@ CREATE TABLE `rent_payments` (
 CREATE TABLE `reports` (
   `report_id`       int NOT NULL AUTO_INCREMENT,
   `generated_by`    int DEFAULT NULL,
-  `dormitory_id`    int DEFAULT NULL,
   `generation_date` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `file_path`       varchar(255) DEFAULT NULL,
   PRIMARY KEY (`report_id`),
   KEY `generated_by` (`generated_by`),
-  KEY `dormitory_id` (`dormitory_id`),
-  CONSTRAINT `reports_user_fk` FOREIGN KEY (`generated_by`) REFERENCES `users` (`user_id`),
-  CONSTRAINT `reports_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`)
+  CONSTRAINT `reports_user_fk` FOREIGN KEY (`generated_by`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- ─── APPLICATION FILES ───────────────────────────────────────────────────────

@@ -115,8 +115,8 @@ export class StudentDashboardComponent implements OnInit {
   documents: DocumentItem[] = [
     { name: 'Enrollment Certificate', icon: 'document-text.svg',  uploaded: true,  date: 'Jan 10, 2026', required: true  },
     { name: 'Student ID',             icon: 'identification.svg', uploaded: true,  date: 'Jan 10, 2026', required: true  },
-    { name: 'Residence Card',         icon: 'home.svg',           uploaded: false, date: '',              required: true  },
-    { name: 'Passport / Valid ID',    icon: 'identification.svg', uploaded: true,  date: 'Jan 10, 2026', required: false },
+    { name: 'Residence Card',         icon: 'home.svg',           uploaded: false, date: '',              required: false  },
+    { name: 'Passport / Valid ID',    icon: 'identification.svg', uploaded: true,  date: 'Jan 10, 2026', required: true },
   ];
   docMsg = '';
 
@@ -254,7 +254,7 @@ export class StudentDashboardComponent implements OnInit {
           dueDate: `${monthNames[nextDue.getMonth()]} 15, ${nextDue.getFullYear()}`,
           daysLeft,
         };
-        this.stats[2].value  = `₱${this.contractInfo.monthlyRent.toLocaleString()}`;
+        this.stats[2].value  = `€${this.contractInfo.monthlyRent.toLocaleString()}`;
         this.stats[2].change = `Due ${this.nextPayment.dueDate}`;
       },
       error: () => {}
@@ -455,7 +455,7 @@ export class StudentDashboardComponent implements OnInit {
     this.api.recordPayment(this.paymentMonth, this.paymentAmount).subscribe({
       next: () => {
         const amt = this.paymentAmount?.toLocaleString();
-        this.paymentMsg     = `Payment of ₱${amt} for ${this.paymentMonth} submitted!`;
+        this.paymentMsg     = `Payment of €${amt} for ${this.paymentMonth} submitted!`;
         this.paymentErr     = false;
         this.paymentMonth   = '';
         this.paymentAmount  = null;
