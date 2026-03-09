@@ -41,7 +41,7 @@ CREATE TABLE `dormitories` (
   `max_capacity`  int NOT NULL DEFAULT 50,
   `created_at`    timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`dormitory_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ─── FILE METADATA ────────────────────────────────────────────────────────────
 
@@ -51,7 +51,7 @@ CREATE TABLE `file_metadata` (
   `file_type`   varchar(50)  DEFAULT NULL,
   `upload_date` timestamp    NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`file_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ─── USERS ───────────────────────────────────────────────────────────────────
 
@@ -63,8 +63,10 @@ CREATE TABLE `users` (
   `role`          enum('STUDENT','ADMIN') NOT NULL,
   `created_at`    timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`user_id`),
-  UNIQUE KEY `email` (`email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  UNIQUE KEY `email` (`email`),
+  KEY `dormitory_id` (`dormitory_id`),
+  CONSTRAINT `users_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ─── ROOMS ───────────────────────────────────────────────────────────────────
 -- Represents individual rooms within the dormitory.
@@ -80,8 +82,9 @@ CREATE TABLE `rooms` (
   PRIMARY KEY (`room_id`),
   UNIQUE KEY `room_number_unique` (`room_number`),
   KEY `resident_id` (`resident_id`),
-  CONSTRAINT `rooms_resident_fk` FOREIGN KEY (`resident_id`) REFERENCES `users` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  CONSTRAINT `rooms_dorm_fk`     FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`),
+  CONSTRAINT `rooms_resident_fk` FOREIGN KEY (`resident_id`)  REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ─── ADMIN PROFILES ──────────────────────────────────────────────────────────
 -- Extended profile for ADMIN users, linked to their dormitory.
@@ -98,7 +101,7 @@ CREATE TABLE `admin_profiles` (
   KEY `dormitory_id` (`dormitory_id`),
   CONSTRAINT `admin_profiles_user_fk` FOREIGN KEY (`user_id`)      REFERENCES `users` (`user_id`),
   CONSTRAINT `admin_profiles_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ─── STUDENT PROFILES ────────────────────────────────────────────────────────
 -- Extended profile for STUDENT users.
@@ -117,9 +120,10 @@ CREATE TABLE `student_profiles` (
   PRIMARY KEY (`profile_id`),
   UNIQUE KEY `user_id` (`user_id`),
   KEY `room_id` (`room_id`),
-  CONSTRAINT `student_profiles_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`),
-  CONSTRAINT `student_profiles_room_fk` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`room_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  CONSTRAINT `student_profiles_user_fk` FOREIGN KEY (`user_id`)      REFERENCES `users` (`user_id`),
+  CONSTRAINT `student_profiles_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`),
+  CONSTRAINT `student_profiles_room_fk` FOREIGN KEY (`room_id`)      REFERENCES `rooms` (`room_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ─── DORM APPLICATIONS ───────────────────────────────────────────────────────
 -- assigned_room_id is set when a room is assigned on acceptance.
@@ -136,7 +140,7 @@ CREATE TABLE `dorm_applications` (
   KEY `assigned_room_id` (`assigned_room_id`),
   CONSTRAINT `dorm_apps_user_fk` FOREIGN KEY (`user_id`)          REFERENCES `users` (`user_id`),
   CONSTRAINT `dorm_apps_room_fk` FOREIGN KEY (`assigned_room_id`) REFERENCES `rooms` (`room_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ─── CONTRACTS ───────────────────────────────────────────────────────────────
 
@@ -151,9 +155,10 @@ CREATE TABLE `contracts` (
   PRIMARY KEY (`contract_id`),
   UNIQUE KEY `user_id` (`user_id`),
   KEY `room_id` (`room_id`),
-  CONSTRAINT `contracts_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`),
-  CONSTRAINT `contracts_room_fk` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`room_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  CONSTRAINT `contracts_user_fk` FOREIGN KEY (`user_id`)      REFERENCES `users` (`user_id`),
+  CONSTRAINT `contracts_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`),
+  CONSTRAINT `contracts_room_fk` FOREIGN KEY (`room_id`)      REFERENCES `rooms` (`room_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ─── COMPLAINTS ──────────────────────────────────────────────────────────────
 
@@ -165,8 +170,10 @@ CREATE TABLE `complaints` (
   `created_at`   timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`complaint_id`),
   KEY `user_id` (`user_id`),
-  CONSTRAINT `complaints_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `dormitory_id` (`dormitory_id`),
+  CONSTRAINT `complaints_user_fk` FOREIGN KEY (`user_id`)      REFERENCES `users` (`user_id`),
+  CONSTRAINT `complaints_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ─── RENT PAYMENTS ───────────────────────────────────────────────────────────
 
@@ -179,8 +186,10 @@ CREATE TABLE `rent_payments` (
   `created_at`     timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`payment_id`),
   KEY `user_id` (`user_id`),
-  CONSTRAINT `payments_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `dormitory_id` (`dormitory_id`),
+  CONSTRAINT `payments_user_fk` FOREIGN KEY (`user_id`)      REFERENCES `users` (`user_id`),
+  CONSTRAINT `payments_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ─── REPORTS ─────────────────────────────────────────────────────────────────
 
@@ -191,8 +200,10 @@ CREATE TABLE `reports` (
   `file_path`       varchar(255) DEFAULT NULL,
   PRIMARY KEY (`report_id`),
   KEY `generated_by` (`generated_by`),
-  CONSTRAINT `reports_user_fk` FOREIGN KEY (`generated_by`) REFERENCES `users` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `dormitory_id` (`dormitory_id`),
+  CONSTRAINT `reports_user_fk` FOREIGN KEY (`generated_by`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `reports_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ─── APPLICATION FILES ───────────────────────────────────────────────────────
 
@@ -205,7 +216,7 @@ CREATE TABLE `application_files` (
   KEY `file_id` (`file_id`),
   CONSTRAINT `app_files_app_fk`  FOREIGN KEY (`application_id`) REFERENCES `dorm_applications` (`application_id`),
   CONSTRAINT `app_files_file_fk` FOREIGN KEY (`file_id`)         REFERENCES `file_metadata` (`file_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ─── PROGRESS ────────────────────────────────────────────────────────────────
 
@@ -219,7 +230,7 @@ CREATE TABLE `progress` (
   PRIMARY KEY (`progress_id`),
   KEY `user_id` (`user_id`),
   CONSTRAINT `progress_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
