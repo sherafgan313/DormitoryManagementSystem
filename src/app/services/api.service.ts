@@ -59,8 +59,33 @@ export class ApiService {
     return this.http.get<any[]>(`${this.BASE}/applications`, { headers: this.headers });
   }
 
-  submitApplication(submission_date: string): Observable<any> {
-    return this.http.post(`${this.BASE}/applications`, { submission_date }, { headers: this.headers });
+  submitApplication(submission_date: string): Observable<{ message: string; applicationId: number }> {
+    return this.http.post<{ message: string; applicationId: number }>(
+      `${this.BASE}/applications`, { submission_date }, { headers: this.headers }
+    );
+  }
+
+  uploadApplicationFiles(appId: number, files: File[]): Observable<any> {
+    const form = new FormData();
+    files.forEach(f => form.append('files', f));
+    // Don't set Content-Type — browser sets it with multipart boundary
+    const headers = new HttpHeaders({ Authorization: this.auth.getToken() ?? '' });
+    return this.http.post(`${this.BASE}/applications/${appId}/files`, form, { headers });
+  }
+
+  getApplicationFiles(appId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.BASE}/applications/${appId}/files`, { headers: this.headers });
+  }
+
+  getMyFiles(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.BASE}/my-files`, { headers: this.headers });
+  }
+
+  downloadFile(fileId: number): Observable<Blob> {
+    return this.http.get(`${this.BASE}/files/${fileId}/download`, {
+      headers: this.headers,
+      responseType: 'blob',
+    });
   }
 
   /** ADMIN only — update an application's status. room_id required when accepting. */
@@ -107,8 +132,28 @@ export class ApiService {
     return this.http.get<any[]>(`${this.BASE}/payments`, { headers: this.headers });
   }
 
-  recordPayment(month: string, amount: number): Observable<any> {
-    return this.http.post(`${this.BASE}/payments`, { month, amount }, { headers: this.headers });
+  recordPayment(month: string, amount: number, receipt?: File): Observable<any> {
+    const form = new FormData();
+    form.append('month', month);
+    form.append('amount', String(amount));
+    if (receipt) form.append('receipt', receipt);
+    const headers = new HttpHeaders({ Authorization: this.auth.getToken() ?? '' });
+    return this.http.post(`${this.BASE}/payments`, form, { headers });
+  }
+
+  verifyPayment(id: number): Observable<any> {
+    return this.http.patch(`${this.BASE}/payments/${id}/verify`, {}, { headers: this.headers });
+  }
+
+  rejectPayment(id: number): Observable<any> {
+    return this.http.patch(`${this.BASE}/payments/${id}/reject`, {}, { headers: this.headers });
+  }
+
+  downloadReceipt(paymentId: number): Observable<Blob> {
+    return this.http.get(`${this.BASE}/payments/${paymentId}/receipt`, {
+      headers: this.headers,
+      responseType: 'blob',
+    });
   }
 
   // ── Reports ───────────────────────────────────────────────────────
@@ -116,8 +161,25 @@ export class ApiService {
     return this.http.get<any[]>(`${this.BASE}/reports`, { headers: this.headers });
   }
 
-  generateReport(): Observable<any> {
-    return this.http.post(`${this.BASE}/reports`, {}, { headers: this.headers });
+  generateReport(): Observable<{ reportId: number; progressId: number }> {
+    return this.http.post<{ reportId: number; progressId: number }>(
+      `${this.BASE}/reports`, {}, { headers: this.headers }
+    );
+  }
+
+  getReportProgress(id: number): Observable<{ percentage: number; status: string }> {
+    return this.http.get<any>(`${this.BASE}/reports/${id}/progress`, { headers: this.headers });
+  }
+
+  downloadReport(id: number): Observable<Blob> {
+    return this.http.get(`${this.BASE}/reports/${id}/download`, {
+      headers: this.headers,
+      responseType: 'blob',
+    });
+  }
+
+  cancelReport(id: number): Observable<any> {
+    return this.http.delete(`${this.BASE}/reports/${id}`, { headers: this.headers });
   }
 
   // ── Student profile ───────────────────────────────────────────────

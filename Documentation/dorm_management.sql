@@ -221,6 +221,19 @@ CREATE TABLE `progress` (
   CONSTRAINT `progress_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- ─── SCHEMA MIGRATIONS ───────────────────────────────────────────────────────
+-- These columns are added here for fresh installs.
+-- Existing installs: server.js runMigrations() applies them automatically.
+
+ALTER TABLE `reports`
+  ADD COLUMN `status`      ENUM('PENDING','COMPLETED','CANCELLED','FAILED') NOT NULL DEFAULT 'PENDING' AFTER `file_path`,
+  ADD COLUMN `progress_id` INT DEFAULT NULL AFTER `status`;
+
+ALTER TABLE `rent_payments`
+  ADD COLUMN `verification_status`
+    ENUM('PENDING_VERIFICATION','VERIFIED','REJECTED') NOT NULL DEFAULT 'PENDING_VERIFICATION'
+    AFTER `receipt_file_id`;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
