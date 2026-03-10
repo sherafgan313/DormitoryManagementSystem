@@ -174,6 +174,28 @@ export class DashboardComponent implements OnInit {
     appId: 0, studentName: '', remarks: '',
   };
 
+  // ── Residents sub-tabs ────────────────────────────────────────────
+  residentsTab: 'new' | 'extension' | 'termination' = 'new';
+
+  // ── Termination requests (admin view) ─────────────────────────────
+  terminationRequests: any[]    = [];
+  termReqsLoading               = false;
+  termReqsError                 = '';
+
+  // ── Admin terminate dialog ────────────────────────────────────────
+  adminTerminateDialog = {
+    open: false,
+    phase: 'form' as 'form' | 'confirm' | 'result',
+    success: false,
+    contractId: 0,
+    selectedStudent: null as any,
+    reason: '',
+    requestedEndDate: '',
+    errorMsg: '',
+    students: [] as any[],
+    studentsLoading: false,
+  };
+
   // ── Complaints ────────────────────────────────────────────────────
   complaints:       Complaint[] = [];
   complaintsLoading = false;
@@ -228,6 +250,7 @@ export class DashboardComponent implements OnInit {
     this.loadRooms();
     this.loadActivity();
     this.loadApplications();
+    this.loadTerminationRequests();
     this.loadComplaints();
     this.loadPayments();
     this.loadReports();
@@ -242,7 +265,7 @@ export class DashboardComponent implements OnInit {
     this.activeNav = id;
     if (id === 'dashboard') { this.loadAdminStats(); this.loadActivity(); }
     if (id === 'rooms')      this.loadRooms();
-    if (id === 'residents')  this.loadApplications();
+    if (id === 'residents')  { this.loadApplications(); this.loadTerminationRequests(); }
     if (id === 'payments')   this.loadPayments();
     if (id === 'requests')   this.loadComplaints();
     if (id === 'reports')    this.loadReports();
@@ -335,6 +358,14 @@ export class DashboardComponent implements OnInit {
         this.cdr.markForCheck();
       },
     });
+  }
+
+  get newApplications(): Application[] {
+    return this.applications.filter((a: any) => !a.application_type || a.application_type === 'NEW');
+  }
+
+  get extensionApplications(): Application[] {
+    return this.applications.filter((a: any) => a.application_type === 'EXTENSION');
   }
 
   // ── Applications ──────────────────────────────────────────────────
@@ -675,6 +706,115 @@ export class DashboardComponent implements OnInit {
         this.cdr.markForCheck();
       },
     });
+  }
+
+  // ── Termination requests (admin) ──────────────────────────────────
+  loadTerminationRequests(): void {
+    this.termReqsLoading = true;
+    this.termReqsError   = '';
+    this.api.getTerminationRequests().subscribe({
+      next: (data) => {
+        this.terminationRequests = data;
+        this.termReqsLoading     = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.termReqsError   = 'Could not load termination requests.';
+        this.termReqsLoading = false;
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  acceptTermReq(id: number): void {
+    this.api.acceptTerminationRequest(id).subscribe({
+      next: () => {
+        this.loadTerminationRequests();
+        this.loadAdminStats();
+        this.loadRooms();
+        this.cdr.markForCheck();
+      },
+      error: () => { this.cdr.markForCheck(); },
+    });
+  }
+
+  rejectTermReq(id: number): void {
+    this.api.rejectTerminationRequest(id).subscribe({
+      next: () => {
+        this.loadTerminationRequests();
+        this.cdr.markForCheck();
+      },
+      error: () => { this.cdr.markForCheck(); },
+    });
+  }
+
+  // ── Admin-initiated termination ────────────────────────────────────
+  openAdminTerminateDialog(): void {
+    this.adminTerminateDialog = {
+      open: true, phase: 'form', success: false,
+      contractId: 0, selectedStudent: null,
+      reason: '', requestedEndDate: '', errorMsg: '',
+      students: [], studentsLoading: true,
+    };
+    this.cdr.markForCheck();
+    this.api.getActiveContractStudents().subscribe({
+      next: (data) => {
+        this.adminTerminateDialog.students        = data;
+        this.adminTerminateDialog.studentsLoading = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.adminTerminateDialog.studentsLoading = false;
+        this.adminTerminateDialog.errorMsg        = 'Could not load students.';
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  selectTerminateStudent(student: any): void {
+    this.adminTerminateDialog.selectedStudent = student;
+    this.adminTerminateDialog.contractId      = student.contract_id;
+    this.cdr.markForCheck();
+  }
+
+  selectTerminateStudentById(contractId: number): void {
+    const student = this.adminTerminateDialog.students.find(s => s.contract_id === Number(contractId));
+    if (student) this.selectTerminateStudent(student);
+  }
+
+  proceedToAdminTerminateConfirm(): void {
+    const d = this.adminTerminateDialog;
+    if (!d.selectedStudent) { d.errorMsg = 'Please select a student.'; this.cdr.markForCheck(); return; }
+    if (!d.reason.trim())   { d.errorMsg = 'Please enter a reason.'; this.cdr.markForCheck(); return; }
+    d.errorMsg = '';
+    d.phase    = 'confirm';
+    this.cdr.markForCheck();
+  }
+
+  confirmAdminTerminate(): void {
+    const d = this.adminTerminateDialog;
+    this.api.adminTerminateContract(d.contractId, d.reason.trim(), new Date().toISOString().slice(0, 10)).subscribe({
+      next: () => {
+        d.phase   = 'result';
+        d.success = true;
+        this.cdr.markForCheck();
+        this.loadTerminationRequests();
+        this.loadAdminStats();
+        this.loadRooms();
+        this.loadApplications();
+      },
+      error: (err: any) => {
+        d.phase    = 'result';
+        d.success  = false;
+        d.errorMsg = err?.error?.message ?? 'Termination failed.';
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  closeAdminTerminateDialog(): void {
+    this.adminTerminateDialog.open = false;
+    this.cdr.markForCheck();
   }
 
   // ── Admin Profile ─────────────────────────────────────────────────

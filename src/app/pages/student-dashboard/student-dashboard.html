@@ -509,6 +509,32 @@
                     <img src="icons/chart-bar.svg" class="icon icon--btn" alt="export"> Export
                   </button>
                 </div>
+
+                <!-- Apply for Termination -->
+                @if (contractInfo.status === 'ACTIVE') {
+                  <div class="contract-action">
+                    <div>
+                      <strong>Apply for Termination</strong>
+                      @if (myTerminationRequest?.status === 'PENDING') {
+                        <p style="color:var(--warning)">
+                          <img src="icons/clock.svg" class="icon icon--xs" alt="pending">
+                          Termination request pending review.
+                        </p>
+                      } @else if (myTerminationRequest?.status === 'REJECTED') {
+                        <p style="color:var(--danger)">
+                          Your last request was rejected. You may submit a new one.
+                        </p>
+                      } @else {
+                        <p>Request early termination of your contract.</p>
+                      }
+                    </div>
+                    <button class="btn--danger"
+                            [disabled]="myTerminationRequest?.status === 'PENDING'"
+                            (click)="openTerminationDialog()">
+                      <img src="icons/x-mark.svg" class="icon icon--btn" alt="terminate"> Apply
+                    </button>
+                  </div>
+                }
               </div>
             </div>
           </div>
@@ -934,11 +960,16 @@
           <div class="section__header">
             <div>
               <h1 class="section__title">Dorm Application</h1>
-              <p class="section__subtitle">Apply for dormitory accommodation or track your existing application.</p>
+              <p class="section__subtitle">
+                @if (hasActiveContract) { Apply for an extension of your current contract. }
+                @else { Apply for dormitory accommodation or track your existing application. }
+              </p>
             </div>
             <button class="btn-primary" (click)="showAppForm = !showAppForm">
               @if (showAppForm) {
                 <img src="icons/x-mark.svg" class="icon icon--btn" alt="cancel"> Cancel
+              } @else if (hasActiveContract) {
+                <img src="icons/plus.svg" class="icon icon--btn" alt="extend"> Apply for Extension
               } @else {
                 <img src="icons/plus.svg" class="icon icon--btn" alt="new"> New Application
               }
@@ -947,10 +978,16 @@
 
           @if (showAppForm) {
             <div class="card form-card">
-              <h3 class="form-card__title">Apply for Dormitory</h3>
+              <h3 class="form-card__title">
+                @if (hasActiveContract) { Apply for Contract Extension } @else { Apply for Dormitory }
+              </h3>
               <p class="form-card__desc">
-                Fill in your preferred move-in date. Our team will review your application and
-                notify you via email within 3–5 business days.
+                @if (hasActiveContract) {
+                  Enter your preferred new end date. Our team will review your extension request within 3–5 business days.
+                } @else {
+                  Fill in your preferred move-in date. Our team will review your application and
+                  notify you via email within 3–5 business days.
+                }
               </p>
 
               <div class="field-group">
@@ -1079,5 +1116,77 @@
       }
 
     </div><!-- /content -->
+
+    <!-- ─── TERMINATION REQUEST DIALOG ────────────────────────────── -->
+    @if (terminationDialog.open) {
+      <div class="conf-backdrop" (click)="closeTerminationDialog()">
+        <div class="conf-modal" (click)="$event.stopPropagation()">
+          <div class="conf-modal__header">
+            <h3>Apply for Contract Termination</h3>
+          </div>
+
+          @if (terminationDialog.phase === 'form') {
+            <div class="conf-modal__body">
+              <p class="conf-modal__lead">Provide the reason for termination and your preferred end date.</p>
+              @if (terminationDialog.errorMsg) {
+                <div class="alert alert--error" style="margin-bottom:0.75rem">{{ terminationDialog.errorMsg }}</div>
+              }
+              <div class="field-group">
+                <label class="field-label">Reason for Termination</label>
+                <textarea class="field-input" rows="4" placeholder="Describe your reason…"
+                          [(ngModel)]="terminationDialog.reason"></textarea>
+              </div>
+              <div class="field-group" style="margin-top:0.85rem">
+                <label class="field-label">Requested End Date</label>
+                <input type="date" class="field-input" [(ngModel)]="terminationDialog.requestedEndDate" />
+              </div>
+            </div>
+            <div class="conf-modal__actions">
+              <button class="btn-secondary" (click)="closeTerminationDialog()">Cancel</button>
+              <button class="btn--danger" (click)="proceedToTerminationConfirm()">Review →</button>
+            </div>
+          }
+
+          @if (terminationDialog.phase === 'confirm') {
+            <div class="conf-modal__body">
+              <p class="conf-modal__lead">Please confirm your termination request:</p>
+              <div class="conf-remark-box">
+                <span class="conf-remark-label">Reason</span>
+                <p>{{ terminationDialog.reason }}</p>
+              </div>
+              <div class="conf-remark-box" style="margin-top:0.5rem">
+                <span class="conf-remark-label">Requested End Date</span>
+                <p>{{ terminationDialog.requestedEndDate | date:'mediumDate' }}</p>
+              </div>
+              <p style="margin-top:0.75rem; font-size:0.85rem; color:var(--text-muted)">
+                If accepted, your actual contract end date will be set to 1 month from the approval date.
+              </p>
+            </div>
+            <div class="conf-modal__actions">
+              <button class="btn-secondary" (click)="terminationDialog.phase = 'form'">← Back</button>
+              <button class="btn--danger" (click)="confirmSubmitTerminationRequest()">Submit Request</button>
+            </div>
+          }
+
+          @if (terminationDialog.phase === 'result') {
+            <div class="conf-modal__body conf-modal__body--result">
+              @if (terminationDialog.success) {
+                <img src="icons/check-circle.svg" class="conf-modal__result-icon conf-modal__result-icon--success" alt="success">
+                <p class="conf-modal__result-title">Request Submitted!</p>
+                <p class="conf-modal__result-msg">Your termination request is now pending admin review.</p>
+              } @else {
+                <img src="icons/exclamation-circle.svg" class="conf-modal__result-icon conf-modal__result-icon--danger" alt="error">
+                <p class="conf-modal__result-title">Submission Failed</p>
+                <p class="conf-modal__result-msg">{{ terminationDialog.errorMsg || 'Please try again later.' }}</p>
+              }
+            </div>
+            <div class="conf-modal__actions">
+              <button class="btn-primary" (click)="closeTerminationDialog()">Close</button>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
   </div><!-- /main -->
 </div><!-- /layout -->

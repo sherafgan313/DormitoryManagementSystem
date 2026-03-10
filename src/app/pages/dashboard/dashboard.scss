@@ -889,8 +889,59 @@ $colors: (
   letter-spacing: 0.05em;
 }
 
-/* Danger variant for confirm button */
+/* Danger variant — same shape as .btn-primary, red background */
 .btn--danger {
-  background: var(--danger) !important;
-  &:hover { filter: brightness(0.9); }
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  padding: 0.6rem 1.25rem;
+  background: var(--danger); color: #fff;
+  border: none; border-radius: var(--radius);
+  font-size: 0.9rem; font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition);
+  white-space: nowrap;
+  &:hover:not(:disabled) { background: #dc2626; }
+  &:disabled { opacity: 0.65; cursor: not-allowed; }
+}
+
+/* Sub-tabs for Residents section */
+.sub-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 1.25rem;
+}
+
+.sub-tab {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+
+  &--active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+
+  &:hover:not(.sub-tab--active) {
+    color: var(--text);
+  }
+}
+
+.btn-secondary {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  &:hover { background: var(--border); }
 }
