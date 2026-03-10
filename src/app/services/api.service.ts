@@ -88,15 +88,15 @@ export class ApiService {
     });
   }
 
-  /** ADMIN only — update an application's status. room_id required when accepting. */
+  /** ADMIN only — update an application's status. Extra fields required when accepting. */
   updateApplicationStatus(
     id: number,
     status: 'ACCEPTED' | 'REJECTED' | 'PENDING',
-    room_id?: number
+    extras?: { room_id: number; start_date: string; end_date: string; monthly_rent: number; due_day: number }
   ): Observable<any> {
     return this.http.patch(
       `${this.BASE}/applications/${id}/status`,
-      { status, room_id },
+      { status, ...extras },
       { headers: this.headers }
     );
   }
@@ -106,12 +106,22 @@ export class ApiService {
     return this.http.get<any>(`${this.BASE}/contracts`, { headers: this.headers });
   }
 
-  createContract(user_id: number, start_date: string, end_date: string, status: string): Observable<any> {
-    return this.http.post(`${this.BASE}/contracts`, { user_id, start_date, end_date, status }, { headers: this.headers });
-  }
-
   updateContractStatus(id: number, status: 'ACTIVE' | 'EXTENDED' | 'TERMINATED'): Observable<any> {
     return this.http.patch(`${this.BASE}/contracts/${id}/status`, { status }, { headers: this.headers });
+  }
+
+  downloadContract(): Observable<Blob> {
+    return this.http.get(`${this.BASE}/contracts/download`, {
+      headers: this.headers,
+      responseType: 'blob',
+    });
+  }
+
+  uploadSignedContract(file: File): Observable<any> {
+    const form = new FormData();
+    form.append('signed_contract', file);
+    const headers = new HttpHeaders({ Authorization: this.auth.getToken() ?? '' });
+    return this.http.post(`${this.BASE}/contracts/sign`, form, { headers });
   }
 
   // ── Complaints ────────────────────────────────────────────────────
@@ -128,6 +138,10 @@ export class ApiService {
   }
 
   // ── Payments ──────────────────────────────────────────────────────
+  getOverduePayments(): Observable<{ overdueMonths: string[]; totalOverdue: number; monthlyRent: number }> {
+    return this.http.get<any>(`${this.BASE}/payments/overdue`, { headers: this.headers });
+  }
+
   getPayments(): Observable<any[]> {
     return this.http.get<any[]>(`${this.BASE}/payments`, { headers: this.headers });
   }

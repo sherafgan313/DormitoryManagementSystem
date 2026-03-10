@@ -130,9 +130,13 @@ export class DashboardComponent implements OnInit {
   appMsg         = '';
   appErr         = false;
 
-  acceptingAppId = 0;
-  selectedRoomId = 0;
-  vacantRooms:   any[] = [];
+  acceptingAppId    = 0;
+  selectedRoomId    = 0;
+  contractStartDate = '';
+  contractEndDate   = '';
+  contractRent: number | null = null;
+  contractDueDay: number      = 15;
+  vacantRooms: any[] = [];
 
   // ── Complaints ────────────────────────────────────────────────────
   complaints:       Complaint[] = [];
@@ -344,22 +348,36 @@ export class DashboardComponent implements OnInit {
   }
 
   cancelAccept(): void {
-    this.acceptingAppId = 0;
-    this.selectedRoomId = 0;
+    this.acceptingAppId    = 0;
+    this.selectedRoomId    = 0;
+    this.contractStartDate = '';
+    this.contractEndDate   = '';
+    this.contractRent      = null;
+    this.contractDueDay    = 15;
   }
 
   confirmAcceptApplication(appId: number): void {
-    if (!this.selectedRoomId) {
-      this.appMsg = 'Please select a room before confirming.';
-      this.appErr = true;
-      return;
-    }
-    this.api.updateApplicationStatus(appId, 'ACCEPTED', this.selectedRoomId).subscribe({
+    if (!this.selectedRoomId)    { this.appMsg = 'Please select a room.';          this.appErr = true; return; }
+    if (!this.contractStartDate) { this.appMsg = 'Please enter a start date.';     this.appErr = true; return; }
+    if (!this.contractEndDate)   { this.appMsg = 'Please enter an end date.';      this.appErr = true; return; }
+    if (!this.contractRent)      { this.appMsg = 'Please enter the monthly rent.'; this.appErr = true; return; }
+
+    this.api.updateApplicationStatus(appId, 'ACCEPTED', {
+      room_id:      this.selectedRoomId,
+      start_date:   this.contractStartDate,
+      end_date:     this.contractEndDate,
+      monthly_rent: this.contractRent,
+      due_day:      this.contractDueDay,
+    }).subscribe({
       next: () => {
-        this.appMsg         = `Application #${appId} accepted and room assigned.`;
-        this.appErr         = false;
-        this.acceptingAppId = 0;
-        this.selectedRoomId = 0;
+        this.appMsg            = `Application #${appId} accepted — contract PDF generated.`;
+        this.appErr            = false;
+        this.acceptingAppId    = 0;
+        this.selectedRoomId    = 0;
+        this.contractStartDate = '';
+        this.contractEndDate   = '';
+        this.contractRent      = null;
+        this.contractDueDay    = 15;
         this.cdr.markForCheck();
         this.loadApplications();
         this.loadAdminStats();

@@ -291,18 +291,44 @@
                       <td class="td-actions">
                         @if (app.status === 'PENDING') {
                           @if (acceptingAppId === app.application_id) {
-                            <select class="field-input field-input--sm" [(ngModel)]="selectedRoomId">
-                              <option [value]="0" disabled>Select room…</option>
-                              @for (r of vacantRooms; track r.room_id) {
-                                <option [value]="r.room_id">{{ r.room_number }} (Fl.{{ r.floor }}, {{ r.type }})</option>
-                              }
-                            </select>
-                            <button class="action-btn action-btn--accept" (click)="confirmAcceptApplication(app.application_id)">
-                              <img src="icons/check.svg" class="icon icon--sm" alt="confirm"> Confirm
-                            </button>
-                            <button class="action-btn action-btn--reject" (click)="cancelAccept()">
-                              <img src="icons/x-mark.svg" class="icon icon--sm" alt="cancel"> Cancel
-                            </button>
+                            <div class="accept-form">
+                              <select class="field-input field-input--sm" [(ngModel)]="selectedRoomId">
+                                <option [value]="0" disabled>Select room…</option>
+                                @for (r of vacantRooms; track r.room_id) {
+                                  <option [value]="r.room_id">{{ r.room_number }} (Fl.{{ r.floor }}, {{ r.type }})</option>
+                                }
+                              </select>
+                              <div class="accept-form__row">
+                                <div>
+                                  <label class="accept-form__label">Start Date</label>
+                                  <input type="date" class="field-input field-input--sm" [(ngModel)]="contractStartDate" />
+                                </div>
+                                <div>
+                                  <label class="accept-form__label">End Date</label>
+                                  <input type="date" class="field-input field-input--sm" [(ngModel)]="contractEndDate" />
+                                </div>
+                              </div>
+                              <div class="accept-form__row">
+                                <div>
+                                  <label class="accept-form__label">Monthly Rent (€)</label>
+                                  <input type="number" class="field-input field-input--sm" placeholder="e.g. 5000"
+                                         [(ngModel)]="contractRent" min="1" />
+                                </div>
+                                <div>
+                                  <label class="accept-form__label">Due Day (1–28)</label>
+                                  <input type="number" class="field-input field-input--sm" placeholder="15"
+                                         [(ngModel)]="contractDueDay" min="1" max="28" />
+                                </div>
+                              </div>
+                              <div class="accept-form__actions">
+                                <button class="action-btn action-btn--accept" (click)="confirmAcceptApplication(app.application_id)">
+                                  <img src="icons/check.svg" class="icon icon--sm" alt="confirm"> Confirm & Generate Contract
+                                </button>
+                                <button class="action-btn action-btn--reject" (click)="cancelAccept()">
+                                  <img src="icons/x-mark.svg" class="icon icon--sm" alt="cancel"> Cancel
+                                </button>
+                              </div>
+                            </div>
                           } @else {
                             <button class="action-btn action-btn--accept" (click)="startAcceptApplication(app.application_id)">
                               <img src="icons/check.svg" class="icon icon--sm" alt="accept"> Accept
@@ -377,22 +403,34 @@
             <div class="card">
               <div class="card__header">
                 <h3 class="card__title">Summary</h3>
+                <span class="card__badge">{{ dormStats.currentMonth }}</span>
               </div>
               <div class="summary-row">
                 <span class="summary-label">Paid this month</span>
-                <span class="summary-value summary-value--success">€22,500</span>
+                <span class="summary-value summary-value--success">
+                  €{{ (dormStats.paidThisMonth ?? 0) | number:'1.2-2' }}
+                </span>
               </div>
               <div class="summary-row">
-                <span class="summary-label">Outstanding</span>
-                <span class="summary-value summary-value--danger">€45,200</span>
+                <span class="summary-label">Pending verification</span>
+                <span class="summary-value summary-value--warning">
+                  €{{ (dormStats.totalOutstanding ?? 0) | number:'1.2-2' }}
+                </span>
               </div>
               <div class="summary-row">
-                <span class="summary-label">Overdue residents</span>
-                <span class="summary-value summary-value--warning">13</span>
+                <span class="summary-label">Overdue last month</span>
+                <span class="summary-value"
+                      [class.summary-value--danger]="(dormStats.overdueResidentCount ?? 0) > 0">
+                  {{ dormStats.overdueResidentCount ?? '—' }} resident(s)
+                </span>
               </div>
               <div class="summary-row">
                 <span class="summary-label">Collection rate</span>
-                <span class="summary-value">67%</span>
+                <span class="summary-value"
+                      [class.summary-value--success]="(dormStats.collectionRate ?? 0) >= 80"
+                      [class.summary-value--warning]="(dormStats.collectionRate ?? 0) < 80">
+                  {{ dormStats.collectionRate ?? '—' }}%
+                </span>
               </div>
             </div>
           </div>
@@ -633,21 +671,24 @@
                   <img src="icons/home.svg" class="icon info-icon" alt="occupancy">
                   <div>
                     <strong>Occupancy</strong>
-                    <p>Current room usage: 81% (104/128)</p>
+                    <p>{{ occupancyPct }}% ({{ dormStats.occupiedRooms ?? '—' }}/{{ dormStats.totalRooms ?? '—' }} rooms)</p>
                   </div>
                 </div>
                 <div class="info-row">
                   <img src="icons/credit-card.svg" class="icon info-icon" alt="payments">
                   <div>
                     <strong>Payments</strong>
-                    <p>13 pending — €45,200 outstanding</p>
+                    <p>
+                      {{ dormStats.overdueResidentCount ?? '—' }} overdue —
+                      €{{ (dormStats.totalOutstanding ?? 0) | number:'1.2-2' }} pending verification
+                    </p>
                   </div>
                 </div>
                 <div class="info-row">
                   <img src="icons/wrench.svg" class="icon info-icon" alt="complaints">
                   <div>
                     <strong>Complaints</strong>
-                    <p>7 open requests, 2 urgent</p>
+                    <p>{{ dormStats.openComplaints ?? '—' }} open request(s)</p>
                   </div>
                 </div>
               </div>
