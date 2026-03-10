@@ -92,7 +92,7 @@ export class ApiService {
   updateApplicationStatus(
     id: number,
     status: 'ACCEPTED' | 'REJECTED' | 'PENDING',
-    extras?: { room_id: number; start_date: string; end_date: string; monthly_rent: number; due_day: number }
+    extras?: { room_id?: number; start_date?: string; end_date?: string; monthly_rent?: number; due_day?: number; remarks?: string }
   ): Observable<any> {
     return this.http.patch(
       `${this.BASE}/applications/${id}/status`,

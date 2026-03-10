@@ -53,6 +53,29 @@ interface Complaint {
   user_email?: string;
 }
 
+interface AcceptDialog {
+  open: boolean;
+  phase: 'confirm' | 'result';
+  success: boolean;
+  appId: number;
+  studentName: string;
+  roomLabel: string;
+  startDate: string;
+  endDate: string;
+  monthlyRent: number | null;
+  dueDay: number;
+  errorMsg: string;
+}
+
+interface RejectDialog {
+  open: boolean;
+  phase: 'remarks' | 'confirm' | 'result';
+  success: boolean;
+  appId: number;
+  studentName: string;
+  remarks: string;
+}
+
 @Component({
   selector: 'app-dashboard',
   imports: [CommonModule, FormsModule],
@@ -137,6 +160,19 @@ export class DashboardComponent implements OnInit {
   contractRent: number | null = null;
   contractDueDay: number      = 15;
   vacantRooms: any[] = [];
+
+  // ── Accept dialog ─────────────────────────────────────────────────
+  acceptDialog: AcceptDialog = {
+    open: false, phase: 'confirm', success: false,
+    appId: 0, studentName: '', roomLabel: '',
+    startDate: '', endDate: '', monthlyRent: null, dueDay: 15, errorMsg: '',
+  };
+
+  // ── Reject dialog ─────────────────────────────────────────────────
+  rejectDialog: RejectDialog = {
+    open: false, phase: 'remarks', success: false,
+    appId: 0, studentName: '', remarks: '',
+  };
 
   // ── Complaints ────────────────────────────────────────────────────
   complaints:       Complaint[] = [];
@@ -356,56 +392,103 @@ export class DashboardComponent implements OnInit {
     this.contractDueDay    = 15;
   }
 
-  confirmAcceptApplication(appId: number): void {
+  openAcceptDialog(appId: number): void {
     if (!this.selectedRoomId)    { this.appMsg = 'Please select a room.';          this.appErr = true; return; }
     if (!this.contractStartDate) { this.appMsg = 'Please enter a start date.';     this.appErr = true; return; }
     if (!this.contractEndDate)   { this.appMsg = 'Please enter an end date.';      this.appErr = true; return; }
     if (!this.contractRent)      { this.appMsg = 'Please enter the monthly rent.'; this.appErr = true; return; }
 
-    this.api.updateApplicationStatus(appId, 'ACCEPTED', {
+    const app  = this.applications.find(a => a.application_id === appId);
+    const room = this.vacantRooms.find((r: any) => r.room_id === this.selectedRoomId);
+
+    this.acceptDialog = {
+      open: true, phase: 'confirm', success: false,
+      appId,
+      studentName: app?.user_name ?? `User #${app?.user_id}`,
+      roomLabel:   room ? `${room.room_number} (Fl.${room.floor}, ${room.type})` : `Room #${this.selectedRoomId}`,
+      startDate:   this.contractStartDate,
+      endDate:     this.contractEndDate,
+      monthlyRent: this.contractRent,
+      dueDay:      this.contractDueDay,
+      errorMsg:    '',
+    };
+    this.cdr.markForCheck();
+  }
+
+  confirmAcceptApplication(): void {
+    this.api.updateApplicationStatus(this.acceptDialog.appId, 'ACCEPTED', {
       room_id:      this.selectedRoomId,
       start_date:   this.contractStartDate,
       end_date:     this.contractEndDate,
-      monthly_rent: this.contractRent,
+      monthly_rent: this.contractRent!,
       due_day:      this.contractDueDay,
     }).subscribe({
       next: () => {
-        this.appMsg            = `Application #${appId} accepted — contract PDF generated.`;
-        this.appErr            = false;
-        this.acceptingAppId    = 0;
-        this.selectedRoomId    = 0;
-        this.contractStartDate = '';
-        this.contractEndDate   = '';
-        this.contractRent      = null;
-        this.contractDueDay    = 15;
+        this.acceptDialog.phase   = 'result';
+        this.acceptDialog.success = true;
+        this.cancelAccept();
+        this.appMsg = '';
         this.cdr.markForCheck();
         this.loadApplications();
         this.loadAdminStats();
         this.loadRooms();
       },
       error: (err: any) => {
-        this.appMsg = err?.error?.message ?? 'Failed to accept application.';
-        this.appErr = true;
+        this.acceptDialog.phase    = 'result';
+        this.acceptDialog.success  = false;
+        this.acceptDialog.errorMsg = err?.error?.message ?? 'Failed to accept application.';
         this.cdr.markForCheck();
       },
     });
   }
 
-  rejectApplication(appId: number): void {
-    this.api.updateApplicationStatus(appId, 'REJECTED').subscribe({
+  closeAcceptDialog(): void {
+    this.acceptDialog.open = false;
+    this.cdr.markForCheck();
+  }
+
+  openRejectDialog(appId: number): void {
+    const app = this.applications.find(a => a.application_id === appId);
+    this.rejectDialog = {
+      open: true, phase: 'remarks', success: false,
+      appId,
+      studentName: app?.user_name ?? `User #${app?.user_id}`,
+      remarks: '',
+    };
+    this.cdr.markForCheck();
+  }
+
+  proceedToRejectConfirm(): void {
+    this.rejectDialog.phase = 'confirm';
+    this.cdr.markForCheck();
+  }
+
+  backToRemarks(): void {
+    this.rejectDialog.phase = 'remarks';
+    this.cdr.markForCheck();
+  }
+
+  confirmRejectApplication(): void {
+    const { appId, remarks } = this.rejectDialog;
+    this.api.updateApplicationStatus(appId, 'REJECTED', { remarks }).subscribe({
       next: () => {
-        this.appMsg = `Application #${appId} rejected.`;
-        this.appErr = false;
+        this.rejectDialog.phase   = 'result';
+        this.rejectDialog.success = true;
         this.cdr.markForCheck();
         this.loadApplications();
         this.loadAdminStats();
       },
       error: () => {
-        this.appMsg = 'Failed to reject application.';
-        this.appErr = true;
+        this.rejectDialog.phase   = 'result';
+        this.rejectDialog.success = false;
         this.cdr.markForCheck();
       },
     });
+  }
+
+  closeRejectDialog(): void {
+    this.rejectDialog.open = false;
+    this.cdr.markForCheck();
   }
 
   // ── Complaints ────────────────────────────────────────────────────

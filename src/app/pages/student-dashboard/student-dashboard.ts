@@ -152,6 +152,16 @@ export class StudentDashboardComponent implements OnInit {
     pollInterval: null as ReturnType<typeof setInterval> | null,
   };
 
+  // ── Complaint dialog ──────────────────────────────────────────────
+  complaintDialog = {
+    open: false,
+    phase: 'confirm' as 'confirm' | 'result',
+    success: false,
+    title: '',
+    descriptionPreview: '',
+    fullDesc: '',
+  };
+
   constructor(
     private router: Router,
     private api: ApiService,
@@ -511,27 +521,48 @@ export class StudentDashboardComponent implements OnInit {
     return days === 1 ? 'Yesterday' : `${days} days ago`;
   }
 
-  submitComplaint(): void {
+  openComplaintDialog(): void {
     if (!this.newComplaint.trim()) { this.complaintMsg = 'Please describe the issue.'; this.complaintErr = true; return; }
+
     const fullDesc = this.newComplaintTitle.trim()
       ? `[${this.newComplaintTitle.trim()}] ${this.newComplaint.trim()}`
       : this.newComplaint.trim();
-    this.api.submitComplaint(fullDesc).subscribe({
+    const preview = this.newComplaint.trim().length > 120
+      ? this.newComplaint.trim().slice(0, 120) + '…'
+      : this.newComplaint.trim();
+
+    this.complaintDialog = {
+      open: true, phase: 'confirm', success: false,
+      title:              this.newComplaintTitle.trim() || '(no title)',
+      descriptionPreview: preview,
+      fullDesc,
+    };
+    this.cdr.markForCheck();
+  }
+
+  confirmSubmitComplaint(): void {
+    this.api.submitComplaint(this.complaintDialog.fullDesc).subscribe({
       next: () => {
-        this.complaintMsg      = 'Complaint submitted! Our team will respond shortly.';
-        this.complaintErr      = false;
+        this.complaintDialog.phase   = 'result';
+        this.complaintDialog.success = true;
         this.newComplaintTitle = '';
         this.newComplaint      = '';
         this.showComplaintForm = false;
+        this.complaintMsg      = '';
         this.cdr.markForCheck();
         this.loadComplaints();
       },
       error: () => {
-        this.complaintMsg = 'Failed to submit. Please try again.';
-        this.complaintErr = true;
+        this.complaintDialog.phase   = 'result';
+        this.complaintDialog.success = false;
         this.cdr.markForCheck();
       },
     });
+  }
+
+  closeComplaintDialog(): void {
+    this.complaintDialog.open = false;
+    this.cdr.markForCheck();
   }
 
   // ── Overdue check ─────────────────────────────────────────────────

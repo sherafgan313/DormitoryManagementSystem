@@ -791,6 +791,59 @@
         </div>
       }
 
+      <!-- ─── COMPLAINT CONFIRMATION DIALOG ────────────────────────── -->
+      @if (complaintDialog.open) {
+        <div class="conf-backdrop" (click)="closeComplaintDialog()">
+          <div class="conf-modal" (click)="$event.stopPropagation()">
+
+            <div class="conf-modal__header">
+              <h3>Confirm Complaint Submission</h3>
+              <button class="file-remove-btn" (click)="closeComplaintDialog()" title="Close">
+                <img src="icons/x-mark.svg" class="icon icon--sm" alt="close">
+              </button>
+            </div>
+
+            @if (complaintDialog.phase === 'confirm') {
+              <div class="conf-modal__body">
+                <p class="conf-modal__lead">Review your complaint before submitting.</p>
+                <div class="conf-remark-box">
+                  <span class="conf-remark-label">Title</span>
+                  <p><strong>{{ complaintDialog.title }}</strong></p>
+                </div>
+                <div class="conf-remark-box" style="margin-top: 0.5rem">
+                  <span class="conf-remark-label">Description</span>
+                  <p>{{ complaintDialog.descriptionPreview }}</p>
+                </div>
+              </div>
+              <div class="conf-modal__actions">
+                <button class="action-btn action-btn--reject" (click)="closeComplaintDialog()">Cancel</button>
+                <button class="btn-primary" (click)="confirmSubmitComplaint()">
+                  <img src="icons/check.svg" class="icon icon--btn" alt="submit"> Submit Complaint
+                </button>
+              </div>
+            }
+
+            @if (complaintDialog.phase === 'result') {
+              <div class="conf-modal__body conf-modal__body--result">
+                @if (complaintDialog.success) {
+                  <img src="icons/check-circle.svg" class="conf-modal__result-icon conf-modal__result-icon--success" alt="success">
+                  <p class="conf-modal__result-title">Complaint Submitted!</p>
+                  <p class="conf-modal__result-msg">Our team will review and respond to your complaint shortly.</p>
+                } @else {
+                  <img src="icons/exclamation-circle.svg" class="conf-modal__result-icon conf-modal__result-icon--danger" alt="error">
+                  <p class="conf-modal__result-title conf-modal__result-title--danger">Submission Failed</p>
+                  <p class="conf-modal__result-msg conf-modal__result-msg--danger">Could not submit complaint. Please try again.</p>
+                }
+              </div>
+              <div class="conf-modal__actions">
+                <button class="btn-primary" (click)="closeComplaintDialog()">Close</button>
+              </div>
+            }
+
+          </div>
+        </div>
+      }
+
       <!-- ─── COMPLAINTS ─────────────────────────────────────────────── -->
       @if (activeNav === 'complaints') {
         <div class="section">
@@ -822,7 +875,7 @@
                           placeholder="Describe the issue in detail…"
                           [(ngModel)]="newComplaint" rows="4"></textarea>
               </div>
-              <button class="btn-primary" style="margin-top: 0.85rem" (click)="submitComplaint()">
+              <button class="btn-primary" style="margin-top: 0.85rem" (click)="openComplaintDialog()">
                 Submit Complaint
               </button>
               @if (complaintMsg) {

@@ -8,7 +8,9 @@
       "Bash(npx tsc:*)",
       "Bash(sed:*)",
       "Bash(node:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(find \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem\" -name \"*.svg\" 2>/dev/null | head -20)",
+      "Bash(find \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem\" -name \"*.svg\" 2>/dev/null | grep -E \"x-circle|exclamation|check-circle\" | head -10)"
     ]
   }
 }
