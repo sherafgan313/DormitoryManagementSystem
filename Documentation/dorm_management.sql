@@ -234,6 +234,11 @@ ALTER TABLE `rent_payments`
     ENUM('PENDING_VERIFICATION','VERIFIED','REJECTED') NOT NULL DEFAULT 'PENDING_VERIFICATION'
     AFTER `receipt_file_id`;
 
+ALTER TABLE `contracts`
+  ADD COLUMN `monthly_rent`          DECIMAL(10,2) DEFAULT NULL AFTER `status`,
+  ADD COLUMN `due_day`               TINYINT       DEFAULT 15   AFTER `monthly_rent`,
+  ADD COLUMN `generated_doc_file_id` INT           DEFAULT NULL AFTER `due_day`;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

@@ -98,6 +98,20 @@
           }
         </div>
 
+        <!-- Overdue warning banner -->
+        @if (overdueInfo.months.length > 0) {
+          <div class="overdue-banner">
+            <div class="overdue-banner__left">
+              <img src="icons/exclamation-triangle.svg" class="icon icon--banner" alt="warning">
+              <div>
+                <strong>{{ overdueInfo.months.length }} overdue payment(s) detected</strong>
+                <p>{{ overdueInfo.months.join(', ') }} — Total: €{{ overdueInfo.total | number:'1.2-2' }}</p>
+              </div>
+            </div>
+            <button class="btn-danger" (click)="navigateTo('payments')">Pay Now</button>
+          </div>
+        }
+
         <!-- Payment due banner -->
         <div class="due-banner">
           <div class="due-banner__left">
@@ -398,8 +412,16 @@
                     <img src="icons/credit-card.svg" class="icon icon--sm" alt="rent"> Monthly Rent
                   </span>
                   <span class="contract-detail-value contract-detail-value--amount">
-                    €{{ contractInfo.monthlyRent | number }}
+                    @if (contractInfo.monthlyRent) {
+                      €{{ contractInfo.monthlyRent | number:'1.2-2' }}
+                    } @else { — }
                   </span>
+                </div>
+                <div class="contract-detail-row">
+                  <span class="contract-detail-label">
+                    <img src="icons/calendar.svg" class="icon icon--sm" alt="due day"> Payment Due
+                  </span>
+                  <span class="contract-detail-value">{{ contractInfo.dueDay }}th of each month</span>
                 </div>
                 <div class="contract-detail-row">
                   <span class="contract-detail-label">
@@ -413,29 +435,71 @@
             <!-- Contract actions -->
             <div class="card form-card">
               <h3 class="form-card__title">Contract Actions</h3>
-              <p class="form-card__desc">
-                Download your signed contract or upload an updated version if requested by management.
-              </p>
+
+              @if (contractUploadMsg) {
+                <div class="alert" [class.alert--success]="!contractUploadErr" [class.alert--error]="contractUploadErr"
+                     style="margin-bottom: 0.75rem">
+                  {{ contractUploadMsg }}
+                </div>
+              }
 
               <div class="contract-action-list">
+                <!-- Download Contract -->
                 <div class="contract-action">
                   <div>
                     <strong>Download Contract</strong>
-                    <p>Get a copy of your signed dormitory agreement.</p>
+                    <p>
+                      @if (contractInfo.hasSignedDoc) { Your signed contract is on file. }
+                      @else if (contractInfo.hasGeneratedDoc) { Download, sign, and upload below. }
+                      @else { Pending admin acceptance — contract not yet generated. }
+                    </p>
                   </div>
-                  <button class="btn-primary">
+                  <button class="btn-primary" (click)="downloadContract()"
+                          [disabled]="!contractInfo.hasGeneratedDoc && !contractInfo.hasSignedDoc">
                     <img src="icons/download.svg" class="icon icon--btn" alt="download"> Download
                   </button>
                 </div>
+
+                <!-- Upload Signed Contract -->
                 <div class="contract-action">
                   <div>
                     <strong>Upload Signed Contract</strong>
-                    <p>Upload a scanned copy of your signed contract.</p>
+                    @if (contractInfo.hasSignedDoc) {
+                      <p style="color:var(--success); margin-top:0.3rem">
+                        <img src="icons/check-circle.svg" class="icon icon--xs" alt="ok">
+                        Signed contract submitted. No further upload required.
+                      </p>
+                    } @else {
+                      <p>Sign the downloaded contract and upload the scanned PDF here.</p>
+                      @if (signedContractFile) {
+                        <div class="selected-file-item" style="margin-top:0.4rem">
+                          <img src="icons/document.svg" class="icon icon--sm" alt="file">
+                          <span class="selected-file-name">{{ signedContractFile.name }}</span>
+                          <span class="selected-file-size">{{ formatFileSize(signedContractFile.size) }}</span>
+                          <button class="file-remove-btn" (click)="removeSignedContract()">
+                            <img src="icons/x-mark.svg" class="icon icon--xs" alt="remove">
+                          </button>
+                        </div>
+                      }
+                    }
                   </div>
-                  <button class="btn-primary">
-                    <img src="icons/upload.svg" class="icon icon--btn" alt="upload"> Upload
-                  </button>
+                  @if (!contractInfo.hasSignedDoc) {
+                    <div style="display:flex; flex-direction:column; gap:0.4rem; align-items:flex-end">
+                      <label class="btn-primary" style="cursor:pointer">
+                        <img src="icons/upload.svg" class="icon icon--btn" alt="select"> Select PDF
+                        <input type="file" accept=".pdf" (change)="onSignedContractSelect($event)" style="display:none" />
+                      </label>
+                      @if (signedContractFile) {
+                        <button class="btn-primary" (click)="uploadSignedContract()" [disabled]="contractUploading">
+                          @if (contractUploading) { <span class="spinner"></span> Uploading… }
+                          @else { <img src="icons/upload.svg" class="icon icon--btn" alt="upload"> Upload }
+                        </button>
+                      }
+                    </div>
+                  }
                 </div>
+
+                <!-- Export Payment History -->
                 <div class="contract-action">
                   <div>
                     <strong>Download Receipts</strong>
@@ -504,6 +568,18 @@
               <p class="section__subtitle">Submit rent payments and view your payment history.</p>
             </div>
           </div>
+
+          @if (overdueInfo.months.length > 0) {
+            <div class="overdue-banner" style="margin-bottom: 1.25rem">
+              <div class="overdue-banner__left">
+                <img src="icons/exclamation-triangle.svg" class="icon icon--banner" alt="warning">
+                <div>
+                  <strong>{{ overdueInfo.months.length }} overdue payment(s)</strong>
+                  <p>{{ overdueInfo.months.join(' · ') }} — €{{ overdueInfo.total | number:'1.2-2' }} total outstanding</p>
+                </div>
+              </div>
+            </div>
+          }
 
           <div class="two-col">
             <!-- Payment form -->

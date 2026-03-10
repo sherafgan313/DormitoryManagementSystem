@@ -31,11 +31,12 @@ db.connect((err) => {
 
 // ─── FILE UPLOAD SETUP ────────────────────────────────────────────────────────
 
-const uploadsDir  = path.join(__dirname, "uploads", "applications");
-const receiptsDir = path.join(__dirname, "uploads", "receipts");
-const reportsDir  = path.join(__dirname, "uploads", "reports");
+const uploadsDir   = path.join(__dirname, "uploads", "applications");
+const receiptsDir  = path.join(__dirname, "uploads", "receipts");
+const reportsDir   = path.join(__dirname, "uploads", "reports");
+const contractsDir = path.join(__dirname, "uploads", "contracts");
 
-[uploadsDir, receiptsDir, reportsDir].forEach(d => {
+[uploadsDir, receiptsDir, reportsDir, contractsDir].forEach(d => {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 });
 
@@ -55,8 +56,9 @@ const fileFilter = (req, file, cb) => {
   else cb(new Error("Only PDF, JPG, and PNG files are allowed"));
 };
 
-const upload        = multer({ storage: makeStorage(uploadsDir),  limits: { fileSize: 5 * 1024 * 1024 }, fileFilter });
-const receiptUpload = multer({ storage: makeStorage(receiptsDir), limits: { fileSize: 5 * 1024 * 1024 }, fileFilter });
+const upload        = multer({ storage: makeStorage(uploadsDir),   limits: { fileSize: 5 * 1024 * 1024 }, fileFilter });
+const receiptUpload = multer({ storage: makeStorage(receiptsDir),  limits: { fileSize: 5 * 1024 * 1024 }, fileFilter });
+const signedUpload  = multer({ storage: makeStorage(contractsDir), limits: { fileSize: 10 * 1024 * 1024 }, fileFilter });
 
 
 // ─── MIGRATIONS ───────────────────────────────────────────────────────────────
@@ -67,6 +69,9 @@ async function runMigrations() {
     `ALTER TABLE reports ADD COLUMN status ENUM('PENDING','COMPLETED','CANCELLED','FAILED') NOT NULL DEFAULT 'PENDING'`,
     `ALTER TABLE reports ADD COLUMN progress_id INT DEFAULT NULL`,
     `ALTER TABLE rent_payments ADD COLUMN verification_status ENUM('PENDING_VERIFICATION','VERIFIED','REJECTED') NOT NULL DEFAULT 'PENDING_VERIFICATION'`,
+    `ALTER TABLE contracts ADD COLUMN monthly_rent DECIMAL(10,2) DEFAULT NULL`,
+    `ALTER TABLE contracts ADD COLUMN due_day TINYINT DEFAULT 15`,
+    `ALTER TABLE contracts ADD COLUMN generated_doc_file_id INT DEFAULT NULL`,
   ];
   for (const sql of migrations) {
     try {
@@ -294,36 +299,97 @@ app.get("/api/applications", authMiddleware, (req, res) => {
 });
 
 app.patch("/api/applications/:id/status", authMiddleware, requireRole("ADMIN"), async (req, res) => {
-  const { status, room_id } = req.body;
+  const { status, room_id, start_date, end_date, monthly_rent, due_day } = req.body;
   const appId = req.params.id;
   const allowed = ["PENDING","ACCEPTED","REJECTED"];
   if (!allowed.includes(status)) return res.status(400).json({ message: `status must be one of: ${allowed.join(", ")}` });
-  if (status === "ACCEPTED" && !room_id) return res.status(400).json({ message: "room_id is required when accepting" });
+  if (status === "ACCEPTED") {
+    if (!room_id)      return res.status(400).json({ message: "room_id is required when accepting" });
+    if (!start_date)   return res.status(400).json({ message: "start_date is required when accepting" });
+    if (!end_date)     return res.status(400).json({ message: "end_date is required when accepting" });
+    if (!monthly_rent) return res.status(400).json({ message: "monthly_rent is required when accepting" });
+    if (!due_day)      return res.status(400).json({ message: "due_day is required when accepting" });
+  }
   const dbp = db.promise();
   try {
     await dbp.query("START TRANSACTION");
     const [apps] = await dbp.query("SELECT user_id FROM dorm_applications WHERE application_id = ?", [appId]);
     if (!apps.length) { await dbp.query("ROLLBACK"); return res.status(404).json({ message: "Application not found" }); }
     const userId = apps[0].user_id;
+
     if (status === "ACCEPTED") {
       const [roomResult] = await dbp.query(
         "UPDATE rooms SET status = 'occupied', resident_id = ? WHERE room_id = ? AND status = 'vacant'",
         [userId, room_id]
       );
       if (!roomResult.affectedRows) { await dbp.query("ROLLBACK"); return res.status(400).json({ message: "Room is not available" }); }
+
       await dbp.query(
         `INSERT INTO student_profiles (user_id, room_id, application_status) VALUES (?,?,'ACCEPTED')
          ON DUPLICATE KEY UPDATE room_id = VALUES(room_id), application_status = 'ACCEPTED'`,
         [userId, room_id]
       );
       await dbp.query("UPDATE dorm_applications SET status = 'ACCEPTED', assigned_room_id = ? WHERE application_id = ?", [room_id, appId]);
+
+      // Create the contract record
+      const [contractResult] = await dbp.query(
+        `INSERT INTO contracts (user_id, room_id, start_date, end_date, status, monthly_rent, due_day)
+         VALUES (?,?,?,?,'ACTIVE',?,?)
+         ON DUPLICATE KEY UPDATE room_id=VALUES(room_id), start_date=VALUES(start_date),
+           end_date=VALUES(end_date), monthly_rent=VALUES(monthly_rent), due_day=VALUES(due_day), status='ACTIVE'`,
+        [userId, room_id, start_date, end_date, monthly_rent, due_day]
+      );
+      const contractId = contractResult.insertId || contractResult.affectedRows;
+
+      // Fetch info needed for PDF
+      const [[student]] = await dbp.query(
+        `SELECT u.name, sp.student_id_number, sp.course, sp.university
+         FROM users u LEFT JOIN student_profiles sp ON u.user_id = sp.user_id WHERE u.user_id = ?`, [userId]);
+      const [[room]] = await dbp.query(
+        `SELECT r.room_number, r.floor, r.type, d.name AS dorm_name, d.address
+         FROM rooms r LEFT JOIN admin_profiles ap ON ap.dormitory_id = r.room_id
+         JOIN dormitories d ON d.dormitory_id = (SELECT dormitory_id FROM admin_profiles WHERE user_id = ? LIMIT 1)
+         WHERE r.room_id = ?`, [req.user.id, room_id]);
+
+      // Get the actual contract_id (handle ON DUPLICATE KEY case)
+      const [[ctr]] = await dbp.query("SELECT contract_id FROM contracts WHERE user_id = ?", [userId]);
+      const realContractId = ctr.contract_id;
+
+      await dbp.query("COMMIT");
+
+      // Generate PDF after commit (non-blocking to response)
+      try {
+        const fileName = await generateContractPdf(realContractId, {
+          studentName:  student.name,
+          studentId:    student.student_id_number,
+          course:       student.course,
+          university:   student.university,
+          dormName:     room.dorm_name,
+          address:      room.address,
+          roomNumber:   room.room_number,
+          floor:        room.floor,
+          roomType:     room.type,
+          startDate:    start_date,
+          endDate:      end_date,
+          monthlyRent:  monthly_rent,
+          dueDay:       due_day,
+        });
+        const [fmResult] = await dbp.query(
+          "INSERT INTO file_metadata (file_path, file_type) VALUES (?, 'application/pdf')", [fileName]);
+        await dbp.query("UPDATE contracts SET generated_doc_file_id = ? WHERE contract_id = ?", [fmResult.insertId, realContractId]);
+      } catch (pdfErr) {
+        console.error("Contract PDF generation failed:", pdfErr.message);
+      }
+
     } else {
       await dbp.query("UPDATE dorm_applications SET status = ? WHERE application_id = ?", [status, appId]);
+      await dbp.query("COMMIT");
     }
-    await dbp.query("COMMIT");
+
     res.json({ message: "Application status updated" });
   } catch (err) {
-    await dbp.query("ROLLBACK");
+    await dbp.query("ROLLBACK").catch(() => {});
+    console.error(err);
     res.status(500).json({ message: "Update failed" });
   }
 });
@@ -453,8 +519,14 @@ app.get("/api/contracts", authMiddleware, (req, res) => {
     );
   } else {
     db.query(
-      `SELECT c.*, r.room_number, r.floor, r.type AS room_type FROM contracts c
-       LEFT JOIN rooms r ON c.room_id = r.room_id WHERE c.user_id = ? LIMIT 1`,
+      `SELECT c.*, r.room_number, r.floor, r.type AS room_type,
+              gf.file_path AS generated_doc_path,
+              sf.file_path AS signed_doc_path
+       FROM contracts c
+       LEFT JOIN rooms r ON c.room_id = r.room_id
+       LEFT JOIN file_metadata gf ON c.generated_doc_file_id = gf.file_id
+       LEFT JOIN file_metadata sf ON c.signed_document_file_id = sf.file_id
+       WHERE c.user_id = ? LIMIT 1`,
       [req.user.id],
       (err, rows) => {
         if (err) return res.status(500).json({ message: "Failed to load contract" });
@@ -462,6 +534,53 @@ app.get("/api/contracts", authMiddleware, (req, res) => {
       }
     );
   }
+});
+
+// Download generated contract PDF (student)
+app.get("/api/contracts/download", authMiddleware, requireRole("STUDENT"), async (req, res) => {
+  const dbp = db.promise();
+  try {
+    const [[contract]] = await dbp.query(
+      `SELECT c.signed_document_file_id, c.generated_doc_file_id,
+              gf.file_path AS gen_path, sf.file_path AS signed_path
+       FROM contracts c
+       LEFT JOIN file_metadata gf ON c.generated_doc_file_id = gf.file_id
+       LEFT JOIN file_metadata sf ON c.signed_document_file_id = sf.file_id
+       WHERE c.user_id = ? LIMIT 1`, [req.user.id]
+    );
+    if (!contract) return res.status(404).json({ message: "No contract found" });
+
+    // Serve signed version if exists, otherwise generated
+    const fileName = contract.signed_path ?? contract.gen_path;
+    if (!fileName) return res.status(404).json({ message: "Contract PDF not yet generated" });
+
+    const filePath = path.join(contractsDir, fileName);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ message: "Contract file not found on server" });
+    res.download(filePath, `contract-${req.user.id}.pdf`);
+  } catch { res.status(500).json({ message: "Download failed" }); }
+});
+
+// Upload signed contract (student) — one-time only
+app.post("/api/contracts/sign", authMiddleware, requireRole("STUDENT"), signedUpload.single("signed_contract"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: "signed_contract file is required" });
+  const dbp = db.promise();
+  try {
+    const [[contract]] = await dbp.query(
+      "SELECT contract_id, signed_document_file_id FROM contracts WHERE user_id = ?", [req.user.id]);
+    if (!contract) return res.status(404).json({ message: "No contract found for this student" });
+    if (contract.signed_document_file_id) {
+      // Remove the freshly-uploaded temp file before rejecting
+      fs.unlink(path.join(contractsDir, req.file.filename), () => {});
+      return res.status(409).json({ message: "Signed contract has already been uploaded. Contact the admin if you need to replace it." });
+    }
+    const [fmResult] = await dbp.query(
+      "INSERT INTO file_metadata (file_path, file_type) VALUES (?, 'application/pdf')", [req.file.filename]);
+    await dbp.query(
+      "UPDATE contracts SET signed_document_file_id = ? WHERE contract_id = ?",
+      [fmResult.insertId, contract.contract_id]
+    );
+    res.json({ message: "Signed contract uploaded successfully" });
+  } catch { res.status(500).json({ message: "Upload failed" }); }
 });
 
 app.patch("/api/contracts/:id/status", authMiddleware, requireRole("ADMIN"), (req, res) => {
@@ -706,6 +825,110 @@ app.get("/api/reports", authMiddleware, requireRole("ADMIN"), (req, res) => {
   );
 });
 
+
+// ─── CONTRACT PDF GENERATION ──────────────────────────────────────────────────
+
+function getOrdinal(n) {
+  const s = ['th','st','nd','rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function generateContractPdf(contractId, d) {
+  return new Promise((resolve, reject) => {
+    const fileName = `contract_${contractId}_${Date.now()}.pdf`;
+    const filePath = path.join(contractsDir, fileName);
+    const doc = new PDFDocument({ margin: 60, size: 'A4' });
+    const stream = fs.createWriteStream(filePath);
+    doc.pipe(stream);
+
+    const blue = '#1a3a5c', accent = '#3b82f6', gray = '#555555', dark = '#1a1a2e';
+
+    // ── Header ──
+    doc.rect(0, 0, 595, 100).fill(blue);
+    doc.fontSize(20).fillColor('#ffffff').text(d.dormName || 'Dormitory', 60, 28, { align: 'center' });
+    doc.fontSize(10).fillColor('#bbccdd').text(d.address || '', 60, 54, { align: 'center' });
+    doc.fontSize(13).fillColor('#ffffff').text('DORMITORY LEASE CONTRACT', 60, 72, { align: 'center' });
+
+    doc.fillColor(dark).moveDown(1);
+    const startY = 115;
+    doc.y = startY;
+
+    doc.fontSize(9).fillColor(gray)
+      .text(`Contract Reference: CTR-${String(contractId).padStart(3,'0')}`, { align: 'right' });
+    doc.moveDown(0.5);
+
+    // ── Section helper ──
+    const section = (title) => {
+      doc.moveDown(0.6);
+      doc.fontSize(11).fillColor(blue).text(title);
+      doc.moveTo(60, doc.y + 2).lineTo(535, doc.y + 2).strokeColor(accent).lineWidth(1).stroke();
+      doc.moveDown(0.5);
+      doc.fontSize(10).fillColor(dark);
+    };
+
+    const row = (label, value) => {
+      doc.fontSize(10);
+      doc.fillColor(gray).text(label + ':', { continued: true, width: 160 });
+      doc.fillColor(dark).text('  ' + (value || '—'));
+    };
+
+    // ── Student Info ──
+    section('STUDENT INFORMATION');
+    row('Full Name',    d.studentName);
+    row('Student ID',  d.studentId);
+    row('Course',      d.course);
+    row('University',  d.university);
+
+    // ── Room Details ──
+    section('ROOM DETAILS');
+    row('Room Number', d.roomNumber);
+    row('Floor',       d.floor);
+    row('Room Type',   d.roomType);
+
+    // ── Contract Terms ──
+    section('CONTRACT TERMS');
+    row('Start Date',     new Date(d.startDate).toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }));
+    row('End Date',       new Date(d.endDate).toLocaleDateString('en-US',   { year:'numeric', month:'long', day:'numeric' }));
+    row('Monthly Rent',   `€${Number(d.monthlyRent).toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
+    row('Payment Due',    `${getOrdinal(Number(d.dueDay))} of each month`);
+
+    // ── T&C ──
+    section('TERMS AND CONDITIONS');
+    const terms = [
+      '1. The tenant shall pay the monthly rent on or before the due date specified above.',
+      '2. Late payments are subject to a 5% penalty per week of delay.',
+      '3. The tenant shall maintain the assigned room in a clean and orderly condition.',
+      '4. Smoking, alcohol, and illegal substances are strictly prohibited on the premises.',
+      '5. Visitors must register at reception and must leave by 10:00 PM.',
+      '6. The tenant is responsible for any damage to dormitory property.',
+      '7. One month written notice is required before vacating.',
+      '8. Management may terminate this contract upon violation of any of the above terms.',
+    ];
+    doc.fontSize(9).fillColor(dark).list(terms, { lineGap: 3, bulletRadius: 2 });
+
+    // ── Signatures ──
+    section('SIGNATURES');
+    doc.moveDown(0.5);
+    const sigY = doc.y;
+
+    doc.fontSize(10).fillColor(dark);
+    doc.text('Student Signature:', 60,  sigY);
+    doc.text('Administrator Signature:', 310, sigY);
+
+    doc.moveTo(60,  sigY + 45).lineTo(250, sigY + 45).strokeColor('#999').lineWidth(0.5).stroke();
+    doc.moveTo(310, sigY + 45).lineTo(500, sigY + 45).strokeColor('#999').lineWidth(0.5).stroke();
+
+    doc.fontSize(9).fillColor(gray);
+    doc.text(d.studentName, 60,  sigY + 48);
+    doc.text('Authorized Signatory',   310, sigY + 48);
+    doc.text('Date: _______________',  60,  sigY + 60);
+    doc.text('Date: _______________',  310, sigY + 60);
+
+    doc.end();
+    stream.on('finish', () => resolve(fileName));
+    stream.on('error',  reject);
+  });
+}
 
 // ─── PDF GENERATION (async) ───────────────────────────────────────────────────
 
@@ -958,27 +1181,110 @@ app.get("/api/users", authMiddleware, requireRole("ADMIN"), (req, res) => {
 });
 
 
+// ─── OVERDUE PAYMENTS (student) ───────────────────────────────────────────────
+
+app.get("/api/payments/overdue", authMiddleware, requireRole("STUDENT"), async (req, res) => {
+  const dbp = db.promise();
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  try {
+    const [[contract]] = await dbp.query(
+      "SELECT start_date, monthly_rent, due_day FROM contracts WHERE user_id = ? AND status = 'ACTIVE' LIMIT 1",
+      [req.user.id]
+    );
+    if (!contract || !contract.start_date) return res.json({ overdueMonths: [], totalOverdue: 0 });
+
+    const [verified] = await dbp.query(
+      "SELECT month FROM rent_payments WHERE user_id = ? AND verification_status = 'VERIFIED'",
+      [req.user.id]
+    );
+    const paidMonths = new Set(verified.map(p => p.month)); // e.g. Set { 'Jan', 'Mar' }
+
+    const now     = new Date();
+    const dueDay  = Number(contract.due_day) || 15;
+    // Last month that is fully past-due: if today >= dueDay then current month counts, else last month
+    const lastDue = now.getDate() >= dueDay
+      ? new Date(now.getFullYear(), now.getMonth(), 1)
+      : new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const start   = new Date(contract.start_date);
+    const cursor  = new Date(start.getFullYear(), start.getMonth(), 1);
+    const overdue = [];
+
+    while (cursor <= lastDue) {
+      const monthStr = MONTHS[cursor.getMonth()];
+      if (!paidMonths.has(monthStr)) {
+        overdue.push(`${monthStr} ${cursor.getFullYear()}`);
+      }
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    res.json({
+      overdueMonths: overdue,
+      totalOverdue:  overdue.length * Number(contract.monthly_rent),
+      monthlyRent:   Number(contract.monthly_rent),
+    });
+  } catch { res.status(500).json({ message: "Failed to check overdue payments" }); }
+});
+
+
 // ─── STATS (admin only) ───────────────────────────────────────────────────────
 
-app.get("/api/stats", authMiddleware, requireRole("ADMIN"), (req, res) => {
-  const queries = {
-    totalRooms:          "SELECT COUNT(*) AS v FROM rooms",
-    occupiedRooms:       "SELECT COUNT(*) AS v FROM rooms WHERE status = 'occupied'",
-    vacantRooms:         "SELECT COUNT(*) AS v FROM rooms WHERE status = 'vacant'",
-    maintenanceRooms:    "SELECT COUNT(*) AS v FROM rooms WHERE status = 'maintenance'",
-    totalStudents:       "SELECT COUNT(*) AS v FROM users WHERE role = 'STUDENT'",
-    pendingApplications: "SELECT COUNT(*) AS v FROM dorm_applications WHERE status = 'PENDING'",
-    openComplaints:      "SELECT COUNT(*) AS v FROM complaints WHERE status != 'RESOLVED'",
-    activeContracts:     "SELECT COUNT(*) AS v FROM contracts WHERE status = 'ACTIVE'",
-    totalPayments:       "SELECT COUNT(*) AS v FROM rent_payments",
-  };
-  const keys = Object.keys(queries); const results = {}; let done = 0;
-  keys.forEach(key => {
-    db.query(queries[key], (err, rows) => {
-      results[key] = err ? 0 : rows[0].v;
-      if (++done === keys.length) res.json(results);
+app.get("/api/stats", authMiddleware, requireRole("ADMIN"), async (req, res) => {
+  const dbp = db.promise();
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const now          = new Date();
+  const currentMonth = MONTHS[now.getMonth()];
+  const lastMonth    = MONTHS[(now.getMonth() + 11) % 12];
+  try {
+    const [
+      [totalRoomsR], [occupiedR], [vacantR], [maintenanceR], [studentsR],
+      [pendingAppsR], [openComplR], [activeCtrsR], [totalPaysR],
+      [paidThisMonthR], [outstandingR], [overdueCountR],
+    ] = await Promise.all([
+      dbp.query("SELECT COUNT(*) AS v FROM rooms"),
+      dbp.query("SELECT COUNT(*) AS v FROM rooms WHERE status = 'occupied'"),
+      dbp.query("SELECT COUNT(*) AS v FROM rooms WHERE status = 'vacant'"),
+      dbp.query("SELECT COUNT(*) AS v FROM rooms WHERE status = 'maintenance'"),
+      dbp.query("SELECT COUNT(*) AS v FROM users WHERE role = 'STUDENT'"),
+      dbp.query("SELECT COUNT(*) AS v FROM dorm_applications WHERE status = 'PENDING'"),
+      dbp.query("SELECT COUNT(*) AS v FROM complaints WHERE status != 'RESOLVED'"),
+      dbp.query("SELECT COUNT(*) AS v FROM contracts WHERE status = 'ACTIVE'"),
+      dbp.query("SELECT COUNT(*) AS v FROM rent_payments"),
+      dbp.query("SELECT COALESCE(SUM(amount),0) AS v FROM rent_payments WHERE month = ? AND verification_status = 'VERIFIED'", [currentMonth]),
+      dbp.query("SELECT COALESCE(SUM(amount),0) AS v FROM rent_payments WHERE verification_status = 'PENDING_VERIFICATION'"),
+      dbp.query(
+        `SELECT COUNT(DISTINCT c.user_id) AS v FROM contracts c WHERE c.status = 'ACTIVE'
+         AND c.user_id NOT IN (
+           SELECT user_id FROM rent_payments WHERE month = ? AND verification_status = 'VERIFIED'
+         )`, [lastMonth]
+      ),
+    ]);
+
+    const activeContracts = activeCtrsR[0].v;
+    const overdueResidentCount = overdueCountR[0].v;
+    const collectionRate = activeContracts > 0
+      ? Math.round((activeContracts - overdueResidentCount) / activeContracts * 100) : 0;
+
+    res.json({
+      totalRooms:          totalRoomsR[0].v,
+      occupiedRooms:       occupiedR[0].v,
+      vacantRooms:         vacantR[0].v,
+      maintenanceRooms:    maintenanceR[0].v,
+      totalStudents:       studentsR[0].v,
+      pendingApplications: pendingAppsR[0].v,
+      openComplaints:      openComplR[0].v,
+      activeContracts,
+      totalPayments:       totalPaysR[0].v,
+      paidThisMonth:       Number(paidThisMonthR[0].v),
+      totalOutstanding:    Number(outstandingR[0].v),
+      overdueResidentCount,
+      collectionRate,
+      currentMonth,
     });
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to load stats" });
+  }
 });
 
 

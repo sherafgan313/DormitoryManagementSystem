@@ -61,8 +61,15 @@ export class StudentDashboardComponent implements OnInit {
   contractInfo = {
     contractId: '—', startDate: '—', endDate: '—',
     status: 'ACTIVE' as 'ACTIVE' | 'EXTENDED' | 'TERMINATED',
-    monthlyRent: 5000,
+    monthlyRent: 0, dueDay: 15,
+    hasGeneratedDoc: false, hasSignedDoc: false,
   };
+
+  // ── Contract upload ────────────────────────────────────────────────
+  signedContractFile: File | null = null;
+  contractUploadMsg  = '';
+  contractUploadErr  = false;
+  contractUploading  = false;
 
   nextPayment = { month: '—', amount: 5000, dueDate: '—', daysLeft: 0 };
 
@@ -135,6 +142,9 @@ export class StudentDashboardComponent implements OnInit {
   paymentsLoading = false;
   paymentsError   = '';
 
+  // ── Overdue payments ──────────────────────────────────────────────
+  overdueInfo: { months: string[]; total: number } = { months: [], total: 0 };
+
   // ── Report modal ──────────────────────────────────────────────────
   reportModal = {
     open: false, reportId: 0, progressId: 0,
@@ -163,6 +173,7 @@ export class StudentDashboardComponent implements OnInit {
     this.loadApplications();
     this.loadPayments();
     this.loadMyFiles();
+    this.loadOverduePayments();
   }
 
   // ── Profile ───────────────────────────────────────────────────────
@@ -208,8 +219,12 @@ export class StudentDashboardComponent implements OnInit {
     this.api.getContracts().subscribe({
       next: (data) => {
         if (!data) return;
-        this.contractInfo.contractId = `CTR-${String(data.contract_id).padStart(3, '0')}`;
-        this.contractInfo.status     = data.status ?? 'ACTIVE';
+        this.contractInfo.contractId      = `CTR-${String(data.contract_id).padStart(3, '0')}`;
+        this.contractInfo.status          = data.status ?? 'ACTIVE';
+        this.contractInfo.monthlyRent     = Number(data.monthly_rent) || 0;
+        this.contractInfo.dueDay          = data.due_day ?? 15;
+        this.contractInfo.hasGeneratedDoc = !!data.generated_doc_path;
+        this.contractInfo.hasSignedDoc    = !!data.signed_doc_path;
 
         if (data.start_date)
           this.contractInfo.startDate = new Date(data.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -228,7 +243,7 @@ export class StudentDashboardComponent implements OnInit {
 
         const now        = new Date();
         const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        const nextDue    = new Date(now.getFullYear(), now.getMonth() + 1, 15);
+        const nextDue    = new Date(now.getFullYear(), now.getMonth() + 1, this.contractInfo.dueDay || 15);
         const daysLeft   = Math.max(0, Math.ceil((nextDue.getTime() - now.getTime()) / 86400000));
         this.nextPayment = {
           month:   monthNames[nextDue.getMonth()],
@@ -252,11 +267,11 @@ export class StudentDashboardComponent implements OnInit {
     this.activeNav = id;
     if (id === 'apply')      this.loadApplications();
     if (id === 'complaints') this.loadComplaints();
-    if (id === 'payments')   this.loadPayments();
+    if (id === 'payments')   { this.loadPayments(); this.loadOverduePayments(); }
     if (id === 'contract')   this.loadMyContract();
     if (id === 'profile')    this.loadProfile();
     if (id === 'documents')  this.loadMyFiles();
-    if (id === 'overview') { this.loadProfile(); this.loadMyContract(); }
+    if (id === 'overview')   { this.loadProfile(); this.loadMyContract(); this.loadOverduePayments(); }
   }
 
   toggleSidebar(): void { this.sidebarOpen = !this.sidebarOpen; }
@@ -519,6 +534,17 @@ export class StudentDashboardComponent implements OnInit {
     });
   }
 
+  // ── Overdue check ─────────────────────────────────────────────────
+  loadOverduePayments(): void {
+    this.api.getOverduePayments().subscribe({
+      next: (data) => {
+        this.overdueInfo = { months: data.overdueMonths, total: data.totalOverdue };
+        this.cdr.markForCheck();
+      },
+      error: () => {},
+    });
+  }
+
   // ── Payments ──────────────────────────────────────────────────────
   loadPayments(): void {
     this.paymentsLoading = true;
@@ -532,6 +558,66 @@ export class StudentDashboardComponent implements OnInit {
       error: () => {
         this.paymentsError   = 'Could not load payments. Make sure the backend is running on port 3000.';
         this.paymentsLoading = false;
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  // ── Contract download / signed upload ─────────────────────────────
+  downloadContract(): void {
+    this.api.downloadContract().subscribe({
+      next: (blob) => {
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'dormitory-contract.pdf';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      error: () => {
+        this.contractUploadMsg = 'Contract not available yet. Contact the admin.';
+        this.contractUploadErr = true;
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  onSignedContractSelect(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files?.length) {
+      this.signedContractFile = input.files[0];
+      input.value = '';
+      this.cdr.markForCheck();
+    }
+  }
+
+  removeSignedContract(): void {
+    this.signedContractFile = null;
+    this.cdr.markForCheck();
+  }
+
+  uploadSignedContract(): void {
+    if (!this.signedContractFile) {
+      this.contractUploadMsg = 'Please select a PDF file to upload.';
+      this.contractUploadErr = true;
+      this.cdr.markForCheck();
+      return;
+    }
+    this.contractUploading = true;
+    this.api.uploadSignedContract(this.signedContractFile).subscribe({
+      next: () => {
+        this.contractUploadMsg    = 'Signed contract uploaded successfully!';
+        this.contractUploadErr    = false;
+        this.signedContractFile   = null;
+        this.contractUploading    = false;
+        this.contractInfo.hasSignedDoc = true;
+        this.cdr.markForCheck();
+        setTimeout(() => { this.contractUploadMsg = ''; this.cdr.markForCheck(); }, 4000);
+      },
+      error: () => {
+        this.contractUploadMsg = 'Upload failed. Please try again.';
+        this.contractUploadErr = true;
+        this.contractUploading = false;
         this.cdr.markForCheck();
       },
     });
