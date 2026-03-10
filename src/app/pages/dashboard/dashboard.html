@@ -321,7 +321,7 @@
                                 </div>
                               </div>
                               <div class="accept-form__actions">
-                                <button class="action-btn action-btn--accept" (click)="confirmAcceptApplication(app.application_id)">
+                                <button class="action-btn action-btn--accept" (click)="openAcceptDialog(app.application_id)">
                                   <img src="icons/check.svg" class="icon icon--sm" alt="confirm"> Confirm & Generate Contract
                                 </button>
                                 <button class="action-btn action-btn--reject" (click)="cancelAccept()">
@@ -333,7 +333,7 @@
                             <button class="action-btn action-btn--accept" (click)="startAcceptApplication(app.application_id)">
                               <img src="icons/check.svg" class="icon icon--sm" alt="accept"> Accept
                             </button>
-                            <button class="action-btn action-btn--reject" (click)="rejectApplication(app.application_id)">
+                            <button class="action-btn action-btn--reject" (click)="openRejectDialog(app.application_id)">
                               <img src="icons/x-mark.svg" class="icon icon--sm" alt="reject"> Reject
                             </button>
                           }
@@ -864,5 +864,130 @@
       }
 
     </div><!-- /content -->
+
+    <!-- ─── ACCEPT APPLICATION DIALOG ──────────────────────────────── -->
+    @if (acceptDialog.open) {
+      <div class="conf-backdrop" (click)="closeAcceptDialog()">
+        <div class="conf-modal" (click)="$event.stopPropagation()">
+
+          <div class="conf-modal__header">
+            <h3>Confirm Application Acceptance</h3>
+            <button class="file-remove-btn" (click)="closeAcceptDialog()" title="Close">
+              <img src="icons/x-mark.svg" class="icon icon--sm" alt="close">
+            </button>
+          </div>
+
+          @if (acceptDialog.phase === 'confirm') {
+            <div class="conf-modal__body">
+              <p class="conf-modal__lead">Review the contract details before confirming.</p>
+              <dl class="conf-summary">
+                <dt>Student</dt>    <dd>{{ acceptDialog.studentName }}</dd>
+                <dt>Room</dt>       <dd>{{ acceptDialog.roomLabel }}</dd>
+                <dt>Start Date</dt> <dd>{{ acceptDialog.startDate }}</dd>
+                <dt>End Date</dt>   <dd>{{ acceptDialog.endDate }}</dd>
+                <dt>Monthly Rent</dt><dd>€{{ acceptDialog.monthlyRent | number:'1.2-2' }}</dd>
+                <dt>Due Day</dt>    <dd>Day {{ acceptDialog.dueDay }} of each month</dd>
+              </dl>
+            </div>
+            <div class="conf-modal__actions">
+              <button class="action-btn action-btn--reject" (click)="closeAcceptDialog()">Cancel</button>
+              <button class="btn-primary" (click)="confirmAcceptApplication()">
+                <img src="icons/check.svg" class="icon icon--btn" alt="confirm"> Confirm &amp; Generate Contract
+              </button>
+            </div>
+          }
+
+          @if (acceptDialog.phase === 'result') {
+            <div class="conf-modal__body conf-modal__body--result">
+              @if (acceptDialog.success) {
+                <img src="icons/check-circle.svg" class="conf-modal__result-icon conf-modal__result-icon--success" alt="success">
+                <p class="conf-modal__result-title">Application Accepted!</p>
+                <p class="conf-modal__result-msg">Contract PDF has been generated for {{ acceptDialog.studentName }}.</p>
+              } @else {
+                <img src="icons/exclamation-circle.svg" class="conf-modal__result-icon conf-modal__result-icon--danger" alt="error">
+                <p class="conf-modal__result-title conf-modal__result-title--danger">Acceptance Failed</p>
+                <p class="conf-modal__result-msg conf-modal__result-msg--danger">{{ acceptDialog.errorMsg }}</p>
+              }
+            </div>
+            <div class="conf-modal__actions">
+              <button class="btn-primary" (click)="closeAcceptDialog()">Close</button>
+            </div>
+          }
+
+        </div>
+      </div>
+    }
+
+    <!-- ─── REJECT APPLICATION DIALOG ──────────────────────────────── -->
+    @if (rejectDialog.open) {
+      <div class="conf-backdrop" (click)="closeRejectDialog()">
+        <div class="conf-modal" (click)="$event.stopPropagation()">
+
+          <div class="conf-modal__header">
+            <h3>Reject Application</h3>
+            <button class="file-remove-btn" (click)="closeRejectDialog()" title="Close">
+              <img src="icons/x-mark.svg" class="icon icon--sm" alt="close">
+            </button>
+          </div>
+
+          @if (rejectDialog.phase === 'remarks') {
+            <div class="conf-modal__body">
+              <p class="conf-modal__lead">
+                Enter a reason for rejecting <strong>{{ rejectDialog.studentName }}</strong>'s application.
+              </p>
+              <div class="field-group" style="margin-top: 0.85rem">
+                <label class="field-label">Rejection Remarks</label>
+                <textarea class="field-input field-textarea" rows="3"
+                          placeholder="e.g. No vacancies available for the requested period…"
+                          [(ngModel)]="rejectDialog.remarks"></textarea>
+              </div>
+            </div>
+            <div class="conf-modal__actions">
+              <button class="action-btn action-btn--reject" (click)="closeRejectDialog()">Cancel</button>
+              <button class="btn-primary" (click)="proceedToRejectConfirm()">Continue</button>
+            </div>
+          }
+
+          @if (rejectDialog.phase === 'confirm') {
+            <div class="conf-modal__body">
+              <p class="conf-modal__lead">
+                Confirm rejection of <strong>{{ rejectDialog.studentName }}</strong>'s application.
+              </p>
+              @if (rejectDialog.remarks) {
+                <div class="conf-remark-box">
+                  <span class="conf-remark-label">Remarks</span>
+                  <p>{{ rejectDialog.remarks }}</p>
+                </div>
+              }
+            </div>
+            <div class="conf-modal__actions">
+              <button class="action-btn action-btn--reject" (click)="backToRemarks()">Back</button>
+              <button class="btn-primary btn--danger" (click)="confirmRejectApplication()">
+                <img src="icons/x-mark.svg" class="icon icon--btn" alt="reject"> Confirm Rejection
+              </button>
+            </div>
+          }
+
+          @if (rejectDialog.phase === 'result') {
+            <div class="conf-modal__body conf-modal__body--result">
+              @if (rejectDialog.success) {
+                <img src="icons/exclamation-circle.svg" class="conf-modal__result-icon conf-modal__result-icon--danger" alt="rejected">
+                <p class="conf-modal__result-title conf-modal__result-title--danger">Application Rejected</p>
+                <p class="conf-modal__result-msg">{{ rejectDialog.studentName }}'s application has been rejected.</p>
+              } @else {
+                <img src="icons/exclamation-triangle.svg" class="conf-modal__result-icon conf-modal__result-icon--warning" alt="error">
+                <p class="conf-modal__result-title conf-modal__result-title--warning">Action Failed</p>
+                <p class="conf-modal__result-msg">Could not reject the application. Please try again.</p>
+              }
+            </div>
+            <div class="conf-modal__actions">
+              <button class="btn-primary" (click)="closeRejectDialog()">Close</button>
+            </div>
+          }
+
+        </div>
+      </div>
+    }
+
   </div><!-- /main -->
 </div><!-- /layout -->
