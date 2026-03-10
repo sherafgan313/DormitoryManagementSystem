@@ -402,6 +402,12 @@
             <div class="card__header">
               <h3 class="card__title">Payment History</h3>
             </div>
+            @if (paymentMsg) {
+              <div class="alert" [class.alert--success]="!paymentErr" [class.alert--error]="paymentErr"
+                   style="margin: 0.75rem 1.25rem">
+                {{ paymentMsg }}
+              </div>
+            }
             @if (paymentsError) {
               <div class="alert alert--error" style="margin:1rem">
                 <img src="icons/exclamation-triangle.svg" class="icon icon--alert" alt="warning"> {{ paymentsError }}
@@ -416,7 +422,10 @@
                     <th>Student</th>
                     <th>Month</th>
                     <th>Amount</th>
+                    <th>Status</th>
+                    <th>Receipt</th>
                     <th>Date</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -426,11 +435,35 @@
                       <td><span class="td-name">{{ p.user_name ?? 'User ' + p.user_id }}</span></td>
                       <td>{{ p.month }}</td>
                       <td class="td-amount">€{{ p.amount | number:'1.2-2' }}</td>
+                      <td>
+                        <span class="badge" [ngClass]="badgeClass(p.verification_status)">
+                          {{ p.verification_status | titlecase }}
+                        </span>
+                      </td>
+                      <td>
+                        @if (p.receipt_path) {
+                          <button class="link-btn" (click)="downloadReceipt(p.payment_id)">
+                            <img src="icons/download.svg" class="icon icon--sm" alt="receipt"> View
+                          </button>
+                        } @else {
+                          <span class="td-muted">—</span>
+                        }
+                      </td>
                       <td class="td-muted">{{ p.created_at | date:'short' }}</td>
+                      <td class="td-actions">
+                        @if (p.verification_status === 'PENDING_VERIFICATION') {
+                          <button class="action-btn action-btn--accept" (click)="verifyPayment(p.payment_id)">
+                            <img src="icons/check.svg" class="icon icon--sm" alt="verify"> Verify
+                          </button>
+                          <button class="action-btn action-btn--reject" (click)="rejectPayment(p.payment_id)">
+                            <img src="icons/x-mark.svg" class="icon icon--sm" alt="reject"> Reject
+                          </button>
+                        }
+                      </td>
                     </tr>
                   } @empty {
                     <tr>
-                      <td colspan="5" class="table-empty">No payments recorded yet.</td>
+                      <td colspan="8" class="table-empty">No payments recorded yet.</td>
                     </tr>
                   }
                 </tbody>
@@ -649,9 +682,13 @@
                       <td>{{ r.generated_by_name ?? 'User ' + r.generated_by }}</td>
                       <td class="td-muted">{{ r.generation_date | date:'short' }}</td>
                       <td>
-                        <a class="link-btn" [href]="r.file_path" target="_blank">
-                          <img src="icons/download.svg" class="icon icon--sm" alt="download"> Download
-                        </a>
+                        @if (r.file_path && r.status === 'COMPLETED') {
+                          <a class="link-btn" [href]="'http://localhost:3000/uploads/reports/' + r.file_path" target="_blank">
+                            <img src="icons/download.svg" class="icon icon--sm" alt="download"> Download
+                          </a>
+                        } @else {
+                          <span class="badge" [ngClass]="badgeClass(r.status)">{{ r.status }}</span>
+                        }
                       </td>
                     </tr>
                   } @empty {

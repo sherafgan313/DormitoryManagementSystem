@@ -278,75 +278,81 @@
           <div class="section__header">
             <div>
               <h1 class="section__title">My Documents</h1>
-              <p class="section__subtitle">Upload and manage your required dormitory documents.</p>
+              <p class="section__subtitle">Files you uploaded with your dorm applications.</p>
             </div>
+            <button class="btn-primary" (click)="navigateTo('apply')">
+              <img src="icons/plus.svg" class="icon icon--btn" alt="apply"> New Application
+            </button>
           </div>
 
           @if (docMsg) {
-            <div class="alert alert--success" style="margin-bottom: 1.25rem">
-              <img src="icons/check-circle.svg" class="icon icon--alert" alt="success"> {{ docMsg }}
+            <div class="alert alert--error" style="margin-bottom: 1.25rem">
+              {{ docMsg }}
             </div>
           }
 
-          <!-- Progress -->
+          <!-- Summary card -->
           <div class="card" style="margin-bottom: 1.25rem">
             <div class="card__header">
-              <h3 class="card__title">Upload Progress</h3>
-              <span class="card__badge">{{ uploadedCount }}/{{ documents.length }} uploaded</span>
+              <h3 class="card__title">Uploaded Files</h3>
+              <span class="card__badge">{{ appFiles.length }} file(s)</span>
             </div>
-            <div class="doc-progress-bar">
-              <div class="doc-progress-bar__fill"
-                   [style.width.%]="(uploadedCount / documents.length) * 100"></div>
-            </div>
-            <p class="doc-progress-note">
-              {{ requiredUploaded }}/{{ requiredCount }} required documents uploaded
-              @if (requiredUploaded < requiredCount) {
-                — <span style="color: var(--danger)">{{ requiredCount - requiredUploaded }} missing</span>
-              } @else {
-                — <span style="color: var(--success)">All required docs complete!</span>
-              }
-            </p>
-          </div>
-
-          <!-- Document cards -->
-          <div class="doc-grid">
-            @for (doc of documents; track doc.name) {
-              <div class="doc-card" [class.doc-card--uploaded]="doc.uploaded" [class.doc-card--missing]="!doc.uploaded">
-                <div class="doc-card__top">
-                  <img [src]="'icons/' + doc.icon" class="icon icon--doc doc-card__icon" [alt]="doc.name">
-                  <div class="doc-card__info">
-                    <h4 class="doc-card__name">{{ doc.name }}</h4>
-                    <p class="doc-card__meta">
-                      @if (doc.required) { <span class="doc-required">Required</span> }
-                      @else { <span class="doc-optional">Optional</span> }
-                    </p>
-                  </div>
-                </div>
-                <div class="doc-card__bottom">
-                  @if (doc.uploaded) {
-                    <div class="doc-status doc-status--ok">
-                      <img src="icons/check-circle.svg" class="icon icon--sm" alt="uploaded"> Uploaded {{ doc.date }}
-                    </div>
-                    <div class="doc-actions">
-                      <button class="link-btn">
-                        <img src="icons/download.svg" class="icon icon--sm" alt="download"> Download
-                      </button>
-                      <button class="link-btn" (click)="simulateUpload(doc)">
-                        <img src="icons/arrow-path.svg" class="icon icon--sm" alt="replace"> Replace
-                      </button>
-                    </div>
-                  } @else {
-                    <div class="doc-status doc-status--missing">
-                      <img src="icons/exclamation-triangle.svg" class="icon icon--sm" alt="missing"> Not uploaded yet
-                    </div>
-                    <button class="btn-primary btn-sm" (click)="simulateUpload(doc)">
-                      <img src="icons/upload.svg" class="icon icon--sm" alt="upload"> Upload
-                    </button>
-                  }
-                </div>
+            @if (appFiles.length > 0) {
+              <div class="doc-progress-bar">
+                <div class="doc-progress-bar__fill" style="width: 100%"></div>
               </div>
+              <p class="doc-progress-note" style="color: var(--success)">
+                <img src="icons/check-circle.svg" class="icon icon--xs" alt="ok">
+                {{ appFiles.length }} document(s) on file — submitted with your application(s).
+              </p>
+            } @else if (!filesLoading) {
+              <p class="doc-progress-note">
+                No documents uploaded yet. Attach files when submitting an application.
+              </p>
             }
           </div>
+
+          @if (filesError) {
+            <div class="alert alert--error">
+              <img src="icons/exclamation-triangle.svg" class="icon icon--alert" alt="warning"> {{ filesError }}
+            </div>
+          } @else if (filesLoading) {
+            <div class="loading-state">Loading documents…</div>
+          } @else {
+            <div class="doc-grid">
+              @for (f of appFiles; track f.file_id) {
+                <div class="doc-card doc-card--uploaded">
+                  <div class="doc-card__top">
+                    <img [src]="'icons/' + fileIcon(f.file_type)" class="icon icon--doc doc-card__icon" alt="file">
+                    <div class="doc-card__info">
+                      <h4 class="doc-card__name">{{ f.stored_name }}</h4>
+                      <p class="doc-card__meta">
+                        App #{{ f.application_id }} ·
+                        <span class="badge badge--sm" [ngClass]="badgeClass(f.application_status)">{{ f.application_status }}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div class="doc-card__bottom">
+                    <div class="doc-status doc-status--ok">
+                      <img src="icons/check-circle.svg" class="icon icon--sm" alt="uploaded">
+                      {{ f.upload_date | date:'mediumDate' }}
+                    </div>
+                    <button class="link-btn" (click)="downloadFile(f.file_id, f.stored_name)">
+                      <img src="icons/download.svg" class="icon icon--sm" alt="download"> Download
+                    </button>
+                  </div>
+                </div>
+              } @empty {
+                <div class="doc-empty">
+                  <img src="icons/document.svg" class="icon icon--doc" alt="no files">
+                  <p>No files uploaded yet.</p>
+                  <button class="btn-primary btn-sm" (click)="navigateTo('apply')">
+                    <img src="icons/plus.svg" class="icon icon--sm" alt="apply"> Submit Application with Files
+                  </button>
+                </div>
+              }
+            </div>
+          }
         </div>
       }
 
@@ -435,21 +441,11 @@
                     <strong>Download Receipts</strong>
                     <p>Export all your payment receipts as PDF.</p>
                   </div>
-                  <button class="btn-primary" (click)="generateReport()" [disabled]="reportLoading">
-                    @if (reportLoading) { <span class="spinner"></span> Generating… }
-                    @else {
-                      <img src="icons/chart-bar.svg" class="icon icon--btn" alt="export"> Export
-                    }
+                  <button class="btn-primary" (click)="generateReport()">
+                    <img src="icons/chart-bar.svg" class="icon icon--btn" alt="export"> Export
                   </button>
                 </div>
               </div>
-
-              @if (reportMsg) {
-                <div class="alert" [class.alert--success]="!reportErr" [class.alert--error]="reportErr"
-                     style="margin-top: 1rem">
-                  {{ reportMsg }}
-                </div>
-              }
             </div>
           </div>
 
@@ -529,6 +525,27 @@
                 <input type="number" class="field-input" placeholder="e.g. 5000"
                        [(ngModel)]="paymentAmount" min="1" />
               </div>
+              <div class="field-group" style="margin-top: 0.85rem">
+                <label class="field-label">
+                  Receipt <span class="badge badge--danger badge--sm" style="vertical-align:middle">Required</span>
+                </label>
+                @if (paymentReceipt) {
+                  <div class="selected-file-item" style="margin-top:0.4rem">
+                    <img src="icons/document.svg" class="icon icon--sm" alt="file">
+                    <span class="selected-file-name">{{ paymentReceipt.name }}</span>
+                    <span class="selected-file-size">{{ formatFileSize(paymentReceipt.size) }}</span>
+                    <button class="file-remove-btn" (click)="removeReceipt()" title="Remove">
+                      <img src="icons/x-mark.svg" class="icon icon--xs" alt="remove">
+                    </button>
+                  </div>
+                } @else {
+                  <label class="file-pick-btn" style="margin-top:0.4rem">
+                    <img src="icons/upload.svg" class="icon icon--xs" alt="upload"> Attach Receipt
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" (change)="onReceiptSelect($event)" style="display:none" />
+                  </label>
+                  <p class="file-pick-hint">PDF, JPG, PNG — max 5 MB</p>
+                }
+              </div>
               <button class="btn-primary btn-full" style="margin-top: 1.1rem"
                       (click)="recordPayment()" [disabled]="paymentLoading">
                 @if (paymentLoading) { <span class="spinner"></span> Submitting… }
@@ -553,20 +570,36 @@
               </div>
               <div class="summary-row">
                 <span class="summary-label">Last Payment</span>
-                <span class="summary-value summary-value--success">€5,000 (Feb)</span>
+                @if (paymentSummary.last) {
+                  <span class="summary-value summary-value--success">
+                    €{{ paymentSummary.last.amount | number:'1.2-2' }} ({{ paymentSummary.last.month }})
+                  </span>
+                } @else {
+                  <span class="summary-value summary-value--warning">None yet</span>
+                }
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Total Paid</span>
+                <span class="summary-value summary-value--success">
+                  €{{ paymentSummary.totalPaid | number:'1.2-2' }}
+                </span>
               </div>
               <div class="summary-row">
                 <span class="summary-label">Next Due</span>
                 <span class="summary-value summary-value--warning">{{ nextPayment.dueDate }}</span>
               </div>
               <div class="summary-row">
-                <span class="summary-label">Balance</span>
-                <span class="summary-value summary-value--danger">€5,000 outstanding</span>
-              </div>
-              <div class="summary-row">
-                <span class="summary-label">Status</span>
+                <span class="summary-label">{{ paymentSummary.currentMonth }} Status</span>
                 <span class="summary-value">
-                  <span class="badge badge--warning">Pending</span>
+                  @if (!paymentSummary.thisMonthPayment) {
+                    <span class="badge badge--danger">Unpaid</span>
+                  } @else if (paymentSummary.thisMonthPayment.verification_status === 'VERIFIED') {
+                    <span class="badge badge--success">Verified</span>
+                  } @else if (paymentSummary.thisMonthPayment.verification_status === 'REJECTED') {
+                    <span class="badge badge--danger">Rejected</span>
+                  } @else {
+                    <span class="badge badge--warning">Pending Review</span>
+                  }
                 </span>
               </div>
             </div>
@@ -576,11 +609,8 @@
           <div class="card table-card" style="margin-top: 1.25rem">
             <div class="card__header" style="padding: 1rem 1.25rem 0">
               <h3 class="card__title">Payment History</h3>
-              <button class="link-btn" (click)="generateReport()" [disabled]="reportLoading">
-                @if (reportLoading) { Generating… }
-                @else {
-                  <img src="icons/chart-bar.svg" class="icon icon--sm" alt="export"> Export Report
-                }
+              <button class="link-btn" (click)="generateReport()">
+                <img src="icons/chart-bar.svg" class="icon icon--sm" alt="export"> Export Report
               </button>
             </div>
             @if (paymentsError) {
@@ -596,6 +626,7 @@
                     <th>Payment ID</th>
                     <th>Month</th>
                     <th>Amount</th>
+                    <th>Status</th>
                     <th>Date</th>
                   </tr>
                 </thead>
@@ -605,11 +636,16 @@
                       <td class="td-mono">#{{ p.payment_id }}</td>
                       <td>{{ p.month }}</td>
                       <td class="td-amount">€{{ p.amount | number:'1.2-2' }}</td>
+                      <td>
+                        <span class="badge" [ngClass]="badgeClass(p.verification_status)">
+                          {{ p.verification_status | titlecase }}
+                        </span>
+                      </td>
                       <td class="td-muted">{{ p.created_at | date:'short' }}</td>
                     </tr>
                   } @empty {
                     <tr>
-                      <td colspan="4" class="table-empty">
+                      <td colspan="5" class="table-empty">
                         No payments recorded yet. Connect the backend or submit one above.
                       </td>
                     </tr>
@@ -617,6 +653,64 @@
                 </tbody>
               </table>
             }
+          </div>
+        </div>
+      }
+
+      <!-- ─── REPORT PROGRESS MODAL ──────────────────────────────────── -->
+      @if (reportModal.open) {
+        <div class="report-modal-backdrop" (click)="closeReportModal()">
+          <div class="report-modal" (click)="$event.stopPropagation()">
+            <div class="report-modal__header">
+              <h3>Generating Report</h3>
+              <button class="file-remove-btn" (click)="closeReportModal()" title="Close">
+                <img src="icons/x-mark.svg" class="icon icon--sm" alt="close">
+              </button>
+            </div>
+
+            <div class="report-modal__body">
+              @if (reportModal.status === 'PENDING' || reportModal.status === '') {
+                <div class="report-modal__spinner">
+                  <span class="spinner spinner--lg"></span>
+                </div>
+                <p class="report-modal__label">Preparing your report…</p>
+              } @else if (reportModal.status === 'COMPLETED') {
+                <img src="icons/check-circle.svg" class="icon report-modal__done-icon" alt="done">
+                <p class="report-modal__label" style="color: var(--success)">Report ready!</p>
+              } @else if (reportModal.status === 'CANCELLED') {
+                <p class="report-modal__label">Report cancelled.</p>
+              } @else if (reportModal.status === 'FAILED') {
+                <p class="report-modal__label" style="color: var(--danger)">Generation failed. Please try again.</p>
+              } @else {
+                <div class="report-modal__spinner">
+                  <span class="spinner spinner--lg"></span>
+                </div>
+                <p class="report-modal__label">{{ reportModal.percentage }}% complete…</p>
+              }
+
+              <div class="report-modal__progress-bar">
+                <div class="report-modal__progress-fill"
+                     [style.width.%]="reportModal.percentage"
+                     [class.report-modal__progress-fill--done]="reportModal.status === 'COMPLETED'">
+                </div>
+              </div>
+            </div>
+
+            <div class="report-modal__actions">
+              @if (reportModal.status === 'COMPLETED') {
+                <button class="btn-primary" (click)="downloadGeneratedReport()">
+                  <img src="icons/download.svg" class="icon icon--btn" alt="download"> Download PDF
+                </button>
+              } @else if (reportModal.status !== 'CANCELLED' && reportModal.status !== 'FAILED') {
+                <button class="action-btn action-btn--reject" (click)="cancelReport()"
+                        [disabled]="reportModal.reportId === 0">
+                  <img src="icons/x-mark.svg" class="icon icon--sm" alt="cancel"> Cancel
+                </button>
+              }
+              @if (reportModal.status === 'CANCELLED' || reportModal.status === 'FAILED') {
+                <button class="btn-primary" (click)="closeReportModal()">Close</button>
+              }
+            </div>
           </div>
         </div>
       }
@@ -735,24 +829,75 @@
                 <input type="date" class="field-input" [(ngModel)]="newAppDate" />
               </div>
 
-              <div class="apply-checklist">
-                <p class="field-label" style="margin-bottom: 0.5rem">Required Documents (upload in Documents section)</p>
-                <div class="checklist-item" [class.checklist-item--done]="documents[0].uploaded">
-                  <img [src]="documents[0].uploaded ? 'icons/check-circle.svg' : 'icons/square.svg'"
-                       class="icon icon--sm" alt="status"> Enrollment Certificate
+              <!-- Document checklist -->
+              <div class="field-group" style="margin-top: 1.1rem">
+                <div class="checklist-header">
+                  <label class="field-label" style="margin:0">Required Documents</label>
+                  <span class="checklist-progress">{{ checklistDoneCount }}/{{ checklistItems.length }} attached</span>
                 </div>
-                <div class="checklist-item" [class.checklist-item--done]="documents[1].uploaded">
-                  <img [src]="documents[1].uploaded ? 'icons/check-circle.svg' : 'icons/square.svg'"
-                       class="icon icon--sm" alt="status"> Student ID
+                <p class="file-pick-hint" style="margin-bottom: 0.6rem">PDF, JPG, PNG — max 5 MB each</p>
+
+                <div class="doc-checklist">
+                  @for (item of checklistItems; track item.name; let i = $index) {
+                    <div class="doc-checklist-item" [class.doc-checklist-item--done]="item.file">
+                      <span class="doc-checklist-status">
+                        <img [src]="item.file ? 'icons/check-circle.svg' : 'icons/square.svg'"
+                             class="icon icon--sm" alt="status">
+                      </span>
+                      <img [src]="'icons/' + item.icon" class="icon icon--sm" alt="doc">
+                      <div class="doc-checklist-info">
+                        <span class="doc-checklist-name">{{ item.name }}</span>
+                        @if (item.file) {
+                          <span class="doc-checklist-filename">{{ item.file.name }} · {{ formatFileSize(item.file.size) }}</span>
+                        }
+                      </div>
+                      <span class="doc-checklist-badge">
+                        @if (item.required) { <span class="badge badge--danger badge--sm">Required</span> }
+                        @else               { <span class="badge badge--info badge--sm">Optional</span> }
+                      </span>
+                      @if (item.file) {
+                        <button class="file-remove-btn" (click)="removeChecklistFile(i)" title="Remove">
+                          <img src="icons/x-mark.svg" class="icon icon--xs" alt="remove">
+                        </button>
+                      } @else {
+                        <label class="file-pick-btn--sm">
+                          <img src="icons/upload.svg" class="icon icon--xs" alt="upload"> Upload
+                          <input type="file" accept=".pdf,.jpg,.jpeg,.png"
+                                 (change)="onChecklistFileSelect($event, i)" style="display:none" />
+                        </label>
+                      }
+                    </div>
+                  }
                 </div>
-                <div class="checklist-item" [class.checklist-item--done]="documents[2].uploaded">
-                  <img [src]="documents[2].uploaded ? 'icons/check-circle.svg' : 'icons/square.svg'"
-                       class="icon icon--sm" alt="status"> Residence Card
+
+                <!-- Extra files -->
+                <div class="extra-files-row">
+                  <label class="file-pick-btn">
+                    <img src="icons/plus.svg" class="icon icon--xs" alt="add"> Add More Files
+                    <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png"
+                           (change)="onExtraFileSelect($event)" style="display:none" />
+                  </label>
+                  @if (extraFiles.length > 0) {
+                    <ul class="selected-files-list" style="margin-top: 0.5rem">
+                      @for (f of extraFiles; track f.name; let i = $index) {
+                        <li class="selected-file-item">
+                          <img src="icons/document.svg" class="icon icon--sm" alt="file">
+                          <span class="selected-file-name">{{ f.name }}</span>
+                          <span class="selected-file-size">{{ formatFileSize(f.size) }}</span>
+                          <button class="file-remove-btn" (click)="removeExtraFile(i)" title="Remove">
+                            <img src="icons/x-mark.svg" class="icon icon--xs" alt="remove">
+                          </button>
+                        </li>
+                      }
+                    </ul>
+                  }
                 </div>
               </div>
 
-              <button class="btn-primary" style="margin-top: 1rem" (click)="submitApplication()">
-                Submit Application
+              <button class="btn-primary" style="margin-top: 1rem"
+                      (click)="submitApplication()" [disabled]="appLoading">
+                @if (appLoading) { <span class="spinner"></span> Submitting… }
+                @else { Submit Application }
               </button>
               @if (appMsg) {
                 <div class="alert" [class.alert--success]="!appErr" [class.alert--error]="appErr"

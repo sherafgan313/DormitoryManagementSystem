@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -27,14 +27,6 @@ interface StudentActivity {
   icon: string;
 }
 
-interface DocumentItem {
-  name: string;
-  icon: string;
-  uploaded: boolean;
-  date: string;
-  required: boolean;
-}
-
 @Component({
   selector: 'app-student-dashboard',
   imports: [CommonModule, FormsModule],
@@ -48,46 +40,37 @@ export class StudentDashboardComponent implements OnInit {
 
   navItems = [
     { id: 'overview',   label: 'Overview',    icon: 'chart-bar.svg'     },
-    { id: 'profile',    label: 'Profile',     icon: 'user.svg'           },
-    { id: 'documents',  label: 'Documents',   icon: 'document.svg'       },
-    { id: 'contract',   label: 'My Contract', icon: 'clipboard-list.svg' },
-    { id: 'payments',   label: 'Payments',    icon: 'credit-card.svg'    },
-    { id: 'complaints', label: 'Complaints',  icon: 'wrench.svg'         },
-    { id: 'apply',      label: 'Apply',       icon: 'home.svg'           },
+    { id: 'profile',    label: 'Profile',     icon: 'user.svg'          },
+    { id: 'documents',  label: 'Documents',   icon: 'document.svg'      },
+    { id: 'contract',   label: 'My Contract', icon: 'clipboard-list.svg'},
+    { id: 'payments',   label: 'Payments',    icon: 'credit-card.svg'   },
+    { id: 'complaints', label: 'Complaints',  icon: 'wrench.svg'        },
+    { id: 'apply',      label: 'Apply',       icon: 'home.svg'          },
   ];
 
-  // ── Student identity (populated from API) ─────────────────────────
+  // ── Student identity ───────────────────────────────────────────────
   student = {
-    name:           'Student',
-    email:          '',
-    mobile:         '',
-    studentId:      '',
-    course:         '',
-    university:     '',
-    initials:       'S',
-    dormitoryName:  '',
-    dormContactEmail: '',
-    dormContactPhone: '',
+    name: 'Student', email: '', mobile: '', studentId: '',
+    course: '', university: '', initials: 'S',
+    dormitoryName: '', dormContactEmail: '', dormContactPhone: '',
   };
 
-  // ── Room & contract (populated from API) ──────────────────────────
+  // ── Room & contract ────────────────────────────────────────────────
   roomInfo = { number: '—', floor: 0, type: '—' };
 
   contractInfo = {
-    contractId:   '—',
-    startDate:    '—',
-    endDate:      '—',
-    status:       'ACTIVE' as 'ACTIVE' | 'EXTENDED' | 'TERMINATED',
-    monthlyRent:  5000,
+    contractId: '—', startDate: '—', endDate: '—',
+    status: 'ACTIVE' as 'ACTIVE' | 'EXTENDED' | 'TERMINATED',
+    monthlyRent: 5000,
   };
 
   nextPayment = { month: '—', amount: 5000, dueDate: '—', daysLeft: 0 };
 
   stats = [
-    { label: 'My Room',       value: '—',  change: 'Not assigned',   positive: false, icon: 'home.svg',           color: 'blue'   },
-    { label: 'Contract',      value: '—',  change: '—',              positive: false, icon: 'clipboard-list.svg', color: 'green'  },
-    { label: 'Next Payment',  value: '—',  change: '—',              positive: false, icon: 'credit-card.svg',    color: 'orange' },
-    { label: 'My Complaints', value: 0,    change: '—',              positive: true,  icon: 'wrench.svg',         color: 'yellow' },
+    { label: 'My Room',       value: '—', change: 'Not assigned', positive: false, icon: 'home.svg',           color: 'blue'   },
+    { label: 'Contract',      value: '—', change: '—',            positive: false, icon: 'clipboard-list.svg', color: 'green'  },
+    { label: 'Next Payment',  value: '—', change: '—',            positive: false, icon: 'credit-card.svg',    color: 'orange' },
+    { label: 'My Complaints', value: 0,   change: '—',            positive: true,  icon: 'wrench.svg',         color: 'yellow' },
   ];
 
   recentActivity: StudentActivity[] = [];
@@ -100,49 +83,51 @@ export class StudentDashboardComponent implements OnInit {
   ];
 
   // ── Profile form ──────────────────────────────────────────────────
-  profileForm = {
-    name:       '',
-    email:      '',
-    mobile:     '',
-    studentId:  '',
-    course:     '',
-    university: '',
-  };
-  profileMsg = '';
-  profileErr = false;
+  profileForm = { name: '', email: '', mobile: '', studentId: '', course: '', university: '' };
+  profileMsg  = '';
+  profileErr  = false;
 
-  // ── Documents (static UX demo — real file upload not in scope) ────
-  documents: DocumentItem[] = [
-    { name: 'Enrollment Certificate', icon: 'document-text.svg',  uploaded: true,  date: 'Jan 10, 2026', required: true  },
-    { name: 'Student ID',             icon: 'identification.svg', uploaded: true,  date: 'Jan 10, 2026', required: true  },
-    { name: 'Residence Card',         icon: 'home.svg',           uploaded: false, date: '',              required: false  },
-    { name: 'Passport / Valid ID',    icon: 'identification.svg', uploaded: true,  date: 'Jan 10, 2026', required: true },
-  ];
   docMsg = '';
 
   // ── Applications ──────────────────────────────────────────────────
-  applications:  Application[] = [];
-  appsLoading    = false;
-  appsError      = '';
-  showAppForm    = false;
-  newAppDate     = '';
-  appMsg         = '';
-  appErr         = false;
+  applications: Application[] = [];
+  appsLoading   = false;
+  appsError     = '';
+  showAppForm   = false;
+  newAppDate    = '';
+  appMsg        = '';
+  appErr        = false;
+  appLoading    = false;
+
+  // ── File upload (apply form) ──────────────────────────────────────
+  checklistItems = [
+    { name: 'Enrollment Certificate', required: true,  icon: 'document-text.svg',  file: null as File | null },
+    { name: 'Student ID',             required: true,  icon: 'identification.svg', file: null as File | null },
+    { name: 'Passport / Valid ID',    required: true,  icon: 'identification.svg', file: null as File | null },
+    { name: 'Residence Card',         required: false, icon: 'home.svg',           file: null as File | null },
+  ];
+  extraFiles: File[] = [];
+
+  // ── Documents (uploaded files from API) ───────────────────────────
+  appFiles:    any[] = [];
+  filesLoading = false;
+  filesError   = '';
 
   // ── Complaints ────────────────────────────────────────────────────
-  complaints:        Complaint[] = [];
-  complaintsLoading  = false;
-  complaintsError    = '';
-  showComplaintForm  = false;
-  newComplaintTitle  = '';
-  newComplaint       = '';
-  complaintMsg       = '';
-  complaintErr       = false;
+  complaints:       Complaint[] = [];
+  complaintsLoading = false;
+  complaintsError   = '';
+  showComplaintForm = false;
+  newComplaintTitle = '';
+  newComplaint      = '';
+  complaintMsg      = '';
+  complaintErr      = false;
 
   // ── Payments ──────────────────────────────────────────────────────
   months         = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   paymentMonth   = '';
   paymentAmount: number | null = null;
+  paymentReceipt: File | null  = null;
   paymentMsg     = '';
   paymentErr     = false;
   paymentLoading = false;
@@ -150,15 +135,21 @@ export class StudentDashboardComponent implements OnInit {
   paymentsLoading = false;
   paymentsError   = '';
 
-  // ── Reports ───────────────────────────────────────────────────────
-  reportMsg     = '';
-  reportErr     = false;
-  reportLoading = false;
+  // ── Report modal ──────────────────────────────────────────────────
+  reportModal = {
+    open: false, reportId: 0, progressId: 0,
+    percentage: 0, status: '',
+    pollInterval: null as ReturnType<typeof setInterval> | null,
+  };
 
-  constructor(private router: Router, private api: ApiService, private auth: AuthService) {}
+  constructor(
+    private router: Router,
+    private api: ApiService,
+    private auth: AuthService,
+    private cdr: ChangeDetectorRef,
+  ) {}
 
   ngOnInit(): void {
-    // Seed from localStorage immediately for fast topbar display
     const savedName  = this.auth.getName()  ?? 'Student';
     const savedEmail = this.auth.getEmail() ?? '';
     this.student.name     = savedName;
@@ -166,12 +157,12 @@ export class StudentDashboardComponent implements OnInit {
     this.profileForm.name  = savedName;
     this.profileForm.email = savedEmail;
 
-    // Load all data on init so everything is ready immediately
     this.loadProfile();
     this.loadMyContract();
     this.loadComplaints();
     this.loadApplications();
     this.loadPayments();
+    this.loadMyFiles();
   }
 
   // ── Profile ───────────────────────────────────────────────────────
@@ -182,40 +173,33 @@ export class StudentDashboardComponent implements OnInit {
         this.student.email    = data.email ?? this.student.email;
         this.student.initials = this.student.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
         this.student.mobile   = data.phone ?? '';
-        this.student.studentId   = data.student_id_number ?? '';
-        this.student.course      = data.course      ?? '';
-        this.student.university  = data.university  ?? '';
+        this.student.studentId        = data.student_id_number ?? '';
+        this.student.course           = data.course      ?? '';
+        this.student.university       = data.university  ?? '';
         this.student.dormitoryName    = data.dormitory_name    ?? '';
         this.student.dormContactEmail = data.dorm_contact_email ?? '';
         this.student.dormContactPhone = data.dorm_contact_phone ?? '';
 
-        // Room info
         if (data.room_number) {
-          this.roomInfo.number = data.room_number;
-          this.roomInfo.floor  = data.floor ?? 0;
-          this.roomInfo.type   = data.room_type ?? '—';
-          this.stats[0].value  = data.room_number;
-          this.stats[0].change = `Floor ${data.floor ?? '—'} · ${data.room_type ?? '—'}`;
+          this.roomInfo.number   = data.room_number;
+          this.roomInfo.floor    = data.floor ?? 0;
+          this.roomInfo.type     = data.room_type ?? '—';
+          this.stats[0].value    = data.room_number;
+          this.stats[0].change   = `Floor ${data.floor ?? '—'} · ${data.room_type ?? '—'}`;
           this.stats[0].positive = true;
         }
+        if (data.dorm_contact_email) this.importantContacts[0].value = data.dorm_contact_email;
+        if (data.dorm_contact_phone) this.importantContacts[1].value = data.dorm_contact_phone;
 
-        // Update contacts with real dorm info
-        if (data.dorm_contact_email) {
-          this.importantContacts[0].value = data.dorm_contact_email;
-        }
-        if (data.dorm_contact_phone) {
-          this.importantContacts[1].value = data.dorm_contact_phone;
-        }
-
-        // Pre-fill form
         this.profileForm.name       = data.name              ?? '';
         this.profileForm.email      = data.email             ?? '';
         this.profileForm.mobile     = data.phone             ?? '';
         this.profileForm.studentId  = data.student_id_number ?? '';
         this.profileForm.course     = data.course            ?? '';
         this.profileForm.university = data.university        ?? '';
+        this.cdr.markForCheck();
       },
-      error: () => {} // keep defaults on error
+      error: () => {},
     });
   }
 
@@ -232,22 +216,20 @@ export class StudentDashboardComponent implements OnInit {
         if (data.end_date)
           this.contractInfo.endDate = new Date(data.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-        // Room from contract join
         if (data.room_number && this.roomInfo.number === '—') {
-          this.roomInfo.number = data.room_number;
-          this.stats[0].value  = data.room_number;
+          this.roomInfo.number   = data.room_number;
+          this.stats[0].value    = data.room_number;
           this.stats[0].positive = true;
         }
 
-        this.stats[1].value   = this.contractInfo.status;
-        this.stats[1].change  = `Until ${this.contractInfo.endDate}`;
+        this.stats[1].value    = this.contractInfo.status;
+        this.stats[1].change   = `Until ${this.contractInfo.endDate}`;
         this.stats[1].positive = this.contractInfo.status === 'ACTIVE';
 
-        // Next payment estimate
-        const now = new Date();
+        const now        = new Date();
         const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        const nextDue = new Date(now.getFullYear(), now.getMonth() + 1, 15);
-        const daysLeft = Math.max(0, Math.ceil((nextDue.getTime() - now.getTime()) / 86400000));
+        const nextDue    = new Date(now.getFullYear(), now.getMonth() + 1, 15);
+        const daysLeft   = Math.max(0, Math.ceil((nextDue.getTime() - now.getTime()) / 86400000));
         this.nextPayment = {
           month:   monthNames[nextDue.getMonth()],
           amount:  this.contractInfo.monthlyRent,
@@ -256,8 +238,9 @@ export class StudentDashboardComponent implements OnInit {
         };
         this.stats[2].value  = `€${this.contractInfo.monthlyRent.toLocaleString()}`;
         this.stats[2].change = `Due ${this.nextPayment.dueDate}`;
+        this.cdr.markForCheck();
       },
-      error: () => {}
+      error: () => {},
     });
   }
 
@@ -267,38 +250,27 @@ export class StudentDashboardComponent implements OnInit {
 
   setActive(id: string): void {
     this.activeNav = id;
-    // Always reload on section switch
     if (id === 'apply')      this.loadApplications();
     if (id === 'complaints') this.loadComplaints();
     if (id === 'payments')   this.loadPayments();
     if (id === 'contract')   this.loadMyContract();
     if (id === 'profile')    this.loadProfile();
-    if (id === 'overview') {
-      this.loadProfile();
-      this.loadMyContract();
-    }
+    if (id === 'documents')  this.loadMyFiles();
+    if (id === 'overview') { this.loadProfile(); this.loadMyContract(); }
   }
 
   toggleSidebar(): void { this.sidebarOpen = !this.sidebarOpen; }
 
-  logout(): void {
-    this.auth.logout();
-    this.router.navigate(['/login']);
-  }
+  logout(): void { this.auth.logout(); this.router.navigate(['/login']); }
 
   navigateTo(section: string): void { this.setActive(section); }
 
   badgeClass(status: string): string {
     const map: Record<string, string> = {
-      PENDING:     'badge--warning',
-      ACCEPTED:    'badge--success',
-      REJECTED:    'badge--danger',
-      SUBMITTED:   'badge--info',
-      IN_PROGRESS: 'badge--warning',
-      RESOLVED:    'badge--success',
-      ACTIVE:      'badge--success',
-      EXTENDED:    'badge--info',
-      TERMINATED:  'badge--danger',
+      PENDING: 'badge--warning', ACCEPTED: 'badge--success', REJECTED: 'badge--danger',
+      SUBMITTED: 'badge--info', IN_PROGRESS: 'badge--warning', RESOLVED: 'badge--success',
+      ACTIVE: 'badge--success', EXTENDED: 'badge--info', TERMINATED: 'badge--danger',
+      PENDING_VERIFICATION: 'badge--warning', VERIFIED: 'badge--success',
     };
     return map[status] ?? 'badge--default';
   }
@@ -306,71 +278,182 @@ export class StudentDashboardComponent implements OnInit {
   // ── Profile save ──────────────────────────────────────────────────
   saveProfile(): void {
     this.api.updateProfile({
-      name:              this.profileForm.name,
-      email:             this.profileForm.email,
-      phone:             this.profileForm.mobile,
-      student_id_number: this.profileForm.studentId,
-      course:            this.profileForm.course,
-      university:        this.profileForm.university,
+      name: this.profileForm.name, email: this.profileForm.email,
+      phone: this.profileForm.mobile, student_id_number: this.profileForm.studentId,
+      course: this.profileForm.course, university: this.profileForm.university,
     }).subscribe({
       next: () => {
         Object.assign(this.student, {
-          name:       this.profileForm.name,
-          email:      this.profileForm.email,
-          mobile:     this.profileForm.mobile,
-          studentId:  this.profileForm.studentId,
-          course:     this.profileForm.course,
-          university: this.profileForm.university,
+          name: this.profileForm.name, email: this.profileForm.email,
+          mobile: this.profileForm.mobile, studentId: this.profileForm.studentId,
+          course: this.profileForm.course, university: this.profileForm.university,
         });
-        this.student.initials = this.profileForm.name
-          .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        this.student.initials = this.profileForm.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
         this.profileMsg = 'Profile updated successfully!';
         this.profileErr = false;
-        setTimeout(() => (this.profileMsg = ''), 3000);
+        this.cdr.markForCheck();
+        setTimeout(() => { this.profileMsg = ''; this.cdr.markForCheck(); }, 3000);
       },
       error: (err: any) => {
         this.profileMsg = err?.error?.message ?? 'Failed to update profile.';
         this.profileErr = true;
+        this.cdr.markForCheck();
       },
     });
   }
 
-  // ── Documents (simulated upload) ──────────────────────────────────
-  simulateUpload(doc: DocumentItem): void {
-    doc.uploaded = true;
-    doc.date     = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    this.docMsg  = `${doc.name} uploaded successfully!`;
-    setTimeout(() => (this.docMsg = ''), 3000);
+  // ── Documents ─────────────────────────────────────────────────────
+  loadMyFiles(): void {
+    this.filesLoading = true;
+    this.filesError   = '';
+    this.api.getMyFiles().subscribe({
+      next: (data) => {
+        this.appFiles     = data;
+        this.filesLoading = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.filesError   = 'Could not load documents. Make sure the backend is running.';
+        this.filesLoading = false;
+        this.cdr.markForCheck();
+      },
+    });
   }
 
-  get uploadedCount():  number { return this.documents.filter(d => d.uploaded).length; }
-  get requiredUploaded(): number { return this.documents.filter(d => d.required && d.uploaded).length; }
-  get requiredCount():  number { return this.documents.filter(d => d.required).length; }
+  downloadFile(fileId: number, storedName: string): void {
+    this.api.downloadFile(fileId).subscribe({
+      next: (blob) => {
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = storedName;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      error: () => { this.docMsg = 'Download failed. Please try again.'; this.cdr.markForCheck(); },
+    });
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes < 1024)        return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  fileIcon(mimeType: string): string {
+    if (mimeType?.includes('pdf'))   return 'document-text.svg';
+    if (mimeType?.includes('image')) return 'identification.svg';
+    return 'document.svg';
+  }
+
+  // ── File picker (apply form) ───────────────────────────────────────
+  onChecklistFileSelect(event: Event, index: number): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files?.length) return;
+    this.checklistItems[index].file = input.files[0];
+    input.value = '';
+    this.cdr.markForCheck();
+  }
+
+  removeChecklistFile(index: number): void {
+    this.checklistItems[index].file = null;
+    this.cdr.markForCheck();
+  }
+
+  onExtraFileSelect(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files) return;
+    const existing = new Set(this.extraFiles.map(f => f.name));
+    Array.from(input.files).filter(f => !existing.has(f.name)).forEach(f => this.extraFiles.push(f));
+    input.value = '';
+    this.cdr.markForCheck();
+  }
+
+  removeExtraFile(index: number): void {
+    this.extraFiles.splice(index, 1);
+    this.cdr.markForCheck();
+  }
+
+  get paymentSummary() {
+    const sorted = [...this.payments].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    const last       = sorted[0] ?? null;
+    const totalPaid  = this.payments.reduce((s, p) => s + Number(p.amount), 0);
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const currentMonth = monthNames[new Date().getMonth()];
+    const thisMonthPayment = this.payments.find(p => p.month === currentMonth);
+    return { last, totalPaid, currentMonth, thisMonthPayment };
+  }
+
+  get allSelectedFiles(): File[] {
+    return [...this.checklistItems.filter(i => i.file).map(i => i.file!), ...this.extraFiles];
+  }
+
+  get checklistDoneCount(): number {
+    return this.checklistItems.filter(i => i.file).length;
+  }
 
   // ── Applications ──────────────────────────────────────────────────
   loadApplications(): void {
     this.appsLoading = true;
     this.appsError   = '';
     this.api.getApplications().subscribe({
-      next: (data) => { this.applications = data; this.appsLoading = false; },
+      next: (data) => {
+        this.applications = data;
+        this.appsLoading  = false;
+        this.cdr.markForCheck();
+      },
       error: () => {
         this.appsError   = 'Could not load applications. Make sure the backend is running on port 3000.';
         this.appsLoading = false;
+        this.cdr.markForCheck();
       },
     });
   }
 
   submitApplication(): void {
     if (!this.newAppDate) { this.appMsg = 'Please select a preferred start date.'; this.appErr = true; return; }
+    this.appLoading = true;
+    const filesToUpload = this.allSelectedFiles;
     this.api.submitApplication(this.newAppDate).subscribe({
-      next: () => {
-        this.appMsg  = 'Application submitted! We will review it shortly.';
-        this.appErr  = false;
-        this.newAppDate = '';
-        this.showAppForm = false;
-        this.loadApplications();
+      next: (res) => {
+        const appId = res.applicationId;
+        const resetForm = () => {
+          this.newAppDate  = '';
+          this.showAppForm = false;
+          this.checklistItems.forEach(i => i.file = null);
+          this.extraFiles  = [];
+          this.appLoading  = false;
+          this.cdr.markForCheck();
+          this.loadApplications();
+        };
+
+        if (filesToUpload.length > 0) {
+          this.api.uploadApplicationFiles(appId, filesToUpload).subscribe({
+            next: (uploadRes) => {
+              this.appMsg = `Application submitted with ${uploadRes.count} file(s) uploaded!`;
+              this.appErr = false;
+              resetForm();
+            },
+            error: () => {
+              this.appMsg = 'Application submitted but file upload failed. Try uploading from Documents.';
+              this.appErr = false;
+              resetForm();
+            },
+          });
+        } else {
+          this.appMsg = 'Application submitted! We will review it shortly.';
+          this.appErr = false;
+          resetForm();
+        }
       },
-      error: () => { this.appMsg = 'Failed to submit. Please try again.'; this.appErr = true; },
+      error: () => {
+        this.appMsg     = 'Failed to submit. Please try again.';
+        this.appErr     = true;
+        this.appLoading = false;
+        this.cdr.markForCheck();
+      },
     });
   }
 
@@ -382,23 +465,22 @@ export class StudentDashboardComponent implements OnInit {
       next: (data) => {
         this.complaints        = data;
         this.complaintsLoading = false;
-        // Update overview stat
         const open       = data.filter((c: any) => c.status !== 'RESOLVED').length;
         const inProgress = data.filter((c: any) => c.status === 'IN_PROGRESS').length;
-        this.stats[3].value  = data.length;
-        this.stats[3].change = open > 0 ? `${inProgress} in progress` : 'All resolved';
+        this.stats[3].value    = data.length;
+        this.stats[3].change   = open > 0 ? `${inProgress} in progress` : 'All resolved';
         this.stats[3].positive = open === 0;
-
-        // Derive recent activity from complaints
         this.recentActivity = data.slice(0, 5).map((c: any) => ({
           message: `Complaint #${c.complaint_id} — ${c.status.replace('_', ' ').toLowerCase()}`,
           time:    this.timeAgo(c.created_at),
           icon:    c.status === 'RESOLVED' ? 'check-circle.svg' : 'wrench.svg',
         }));
+        this.cdr.markForCheck();
       },
       error: () => {
         this.complaintsError   = 'Could not load complaints. Make sure the backend is running on port 3000.';
         this.complaintsLoading = false;
+        this.cdr.markForCheck();
       },
     });
   }
@@ -426,9 +508,14 @@ export class StudentDashboardComponent implements OnInit {
         this.newComplaintTitle = '';
         this.newComplaint      = '';
         this.showComplaintForm = false;
+        this.cdr.markForCheck();
         this.loadComplaints();
       },
-      error: () => { this.complaintMsg = 'Failed to submit. Please try again.'; this.complaintErr = true; },
+      error: () => {
+        this.complaintMsg = 'Failed to submit. Please try again.';
+        this.complaintErr = true;
+        this.cdr.markForCheck();
+      },
     });
   }
 
@@ -437,12 +524,31 @@ export class StudentDashboardComponent implements OnInit {
     this.paymentsLoading = true;
     this.paymentsError   = '';
     this.api.getPayments().subscribe({
-      next: (data) => { this.payments = data; this.paymentsLoading = false; },
+      next: (data) => {
+        this.payments        = data;
+        this.paymentsLoading = false;
+        this.cdr.markForCheck();
+      },
       error: () => {
         this.paymentsError   = 'Could not load payments. Make sure the backend is running on port 3000.';
         this.paymentsLoading = false;
+        this.cdr.markForCheck();
       },
     });
+  }
+
+  onReceiptSelect(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files?.length) {
+      this.paymentReceipt = input.files[0];
+      input.value = '';
+      this.cdr.markForCheck();
+    }
+  }
+
+  removeReceipt(): void {
+    this.paymentReceipt = null;
+    this.cdr.markForCheck();
   }
 
   recordPayment(): void {
@@ -451,39 +557,101 @@ export class StudentDashboardComponent implements OnInit {
       this.paymentErr = true;
       return;
     }
+    if (!this.paymentReceipt) {
+      this.paymentMsg = 'Please attach a receipt file.';
+      this.paymentErr = true;
+      return;
+    }
     this.paymentLoading = true;
-    this.api.recordPayment(this.paymentMonth, this.paymentAmount).subscribe({
+    this.api.recordPayment(this.paymentMonth, this.paymentAmount, this.paymentReceipt).subscribe({
       next: () => {
-        const amt = this.paymentAmount?.toLocaleString();
+        const amt           = this.paymentAmount?.toLocaleString();
         this.paymentMsg     = `Payment of €${amt} for ${this.paymentMonth} submitted!`;
         this.paymentErr     = false;
         this.paymentMonth   = '';
         this.paymentAmount  = null;
+        this.paymentReceipt = null;
         this.paymentLoading = false;
+        this.cdr.markForCheck();
         this.loadPayments();
       },
       error: () => {
         this.paymentMsg     = 'Failed to submit payment. Please try again.';
         this.paymentErr     = true;
         this.paymentLoading = false;
+        this.cdr.markForCheck();
       },
     });
   }
 
-  // ── Report ────────────────────────────────────────────────────────
+  // ── Report modal ──────────────────────────────────────────────────
   generateReport(): void {
-    this.reportLoading = true;
+    this.reportModal = { open: true, reportId: 0, progressId: 0, percentage: 0, status: 'PENDING', pollInterval: null };
+    this.cdr.markForCheck();
     this.api.generateReport().subscribe({
-      next: () => {
-        this.reportMsg     = 'Your payment history report has been generated!';
-        this.reportErr     = false;
-        this.reportLoading = false;
+      next: (res) => {
+        this.reportModal.reportId   = res.reportId;
+        this.reportModal.progressId = res.progressId;
+        this.cdr.markForCheck();
+        this.reportModal.pollInterval = setInterval(() => this.pollReportProgress(), 600);
       },
       error: () => {
-        this.reportMsg     = 'Failed to generate report. Please try again.';
-        this.reportErr     = true;
-        this.reportLoading = false;
+        this.reportModal.status = 'FAILED';
+        this.cdr.markForCheck();
       },
+    });
+  }
+
+  pollReportProgress(): void {
+    this.api.getReportProgress(this.reportModal.reportId).subscribe({
+      next: (data: any) => {
+        this.reportModal.percentage = data.percentage ?? 0;
+        this.reportModal.status     = data.reportStatus; // server returns reportStatus, not status
+        this.cdr.markForCheck();
+        if (['COMPLETED', 'CANCELLED', 'FAILED'].includes(data.reportStatus)) {
+          clearInterval(this.reportModal.pollInterval!);
+          this.reportModal.pollInterval = null;
+        }
+      },
+      error: () => {},
+    });
+  }
+
+  cancelReport(): void {
+    this.api.cancelReport(this.reportModal.reportId).subscribe({
+      next: () => {
+        this.reportModal.status = 'CANCELLED';
+        if (this.reportModal.pollInterval) {
+          clearInterval(this.reportModal.pollInterval);
+          this.reportModal.pollInterval = null;
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => {},
+    });
+  }
+
+  closeReportModal(): void {
+    if (this.reportModal.pollInterval) {
+      clearInterval(this.reportModal.pollInterval);
+      this.reportModal.pollInterval = null;
+    }
+    this.reportModal.open = false;
+    this.cdr.markForCheck();
+  }
+
+  downloadGeneratedReport(): void {
+    this.api.downloadReport(this.reportModal.reportId).subscribe({
+      next: (blob) => {
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = `payment-report-${this.reportModal.reportId}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.closeReportModal();
+      },
+      error: () => {},
     });
   }
 }
