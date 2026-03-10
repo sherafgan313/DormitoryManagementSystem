@@ -72,6 +72,20 @@ async function runMigrations() {
     `ALTER TABLE contracts ADD COLUMN monthly_rent DECIMAL(10,2) DEFAULT NULL`,
     `ALTER TABLE contracts ADD COLUMN due_day TINYINT DEFAULT 15`,
     `ALTER TABLE contracts ADD COLUMN generated_doc_file_id INT DEFAULT NULL`,
+    `ALTER TABLE dorm_applications ADD COLUMN application_type ENUM('NEW','EXTENSION') NOT NULL DEFAULT 'NEW'`,
+    `ALTER TABLE contracts ADD COLUMN termination_reason TEXT DEFAULT NULL`,
+    `CREATE TABLE IF NOT EXISTS termination_requests (
+       request_id INT AUTO_INCREMENT PRIMARY KEY,
+       user_id INT NOT NULL,
+       contract_id INT NOT NULL,
+       reason TEXT NOT NULL,
+       requested_end_date DATE NOT NULL,
+       status ENUM('PENDING','ACCEPTED','REJECTED') NOT NULL DEFAULT 'PENDING',
+       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+       FOREIGN KEY (user_id) REFERENCES users(user_id),
+       FOREIGN KEY (contract_id) REFERENCES contracts(contract_id)
+     )`,
+    `ALTER TABLE dorm_applications ADD COLUMN remarks TEXT DEFAULT NULL`,
   ];
   for (const sql of migrations) {
     try {
@@ -263,11 +277,13 @@ app.post("/api/login", (req, res) => {
 // ─── APPLICATIONS ────────────────────────────────────────────────────────────
 
 app.post("/api/applications", authMiddleware, (req, res) => {
-  const { submission_date } = req.body;
+  const { submission_date, application_type = "NEW" } = req.body;
   if (!submission_date) return res.status(400).json({ message: "submission_date is required" });
+  if (!["NEW","EXTENSION"].includes(application_type))
+    return res.status(400).json({ message: "application_type must be NEW or EXTENSION" });
   db.query(
-    "INSERT INTO dorm_applications (user_id, submission_date) VALUES (?,?)",
-    [req.user.id, submission_date],
+    "INSERT INTO dorm_applications (user_id, submission_date, application_type) VALUES (?,?,?)",
+    [req.user.id, submission_date, application_type],
     (err, result) => {
       if (err) return res.status(500).json({ message: "Failed to submit application" });
       res.json({ message: "Application submitted", applicationId: result.insertId });
@@ -299,7 +315,7 @@ app.get("/api/applications", authMiddleware, (req, res) => {
 });
 
 app.patch("/api/applications/:id/status", authMiddleware, requireRole("ADMIN"), async (req, res) => {
-  const { status, room_id, start_date, end_date, monthly_rent, due_day } = req.body;
+  const { status, room_id, start_date, end_date, monthly_rent, due_day, remarks } = req.body;
   const appId = req.params.id;
   const allowed = ["PENDING","ACCEPTED","REJECTED"];
   if (!allowed.includes(status)) return res.status(400).json({ message: `status must be one of: ${allowed.join(", ")}` });
@@ -382,7 +398,7 @@ app.patch("/api/applications/:id/status", authMiddleware, requireRole("ADMIN"), 
       }
 
     } else {
-      await dbp.query("UPDATE dorm_applications SET status = ? WHERE application_id = ?", [status, appId]);
+      await dbp.query("UPDATE dorm_applications SET status = ?, remarks = ? WHERE application_id = ?", [status, remarks || null, appId]);
       await dbp.query("COMMIT");
     }
 
@@ -1224,6 +1240,143 @@ app.get("/api/payments/overdue", authMiddleware, requireRole("STUDENT"), async (
       monthlyRent:   Number(contract.monthly_rent),
     });
   } catch { res.status(500).json({ message: "Failed to check overdue payments" }); }
+});
+
+
+// ─── TERMINATION REQUESTS ─────────────────────────────────────────────────────
+
+// Student submits a termination request
+app.post("/api/termination-requests", authMiddleware, requireRole("STUDENT"), async (req, res) => {
+  const { reason, requested_end_date } = req.body;
+  if (!reason || !requested_end_date)
+    return res.status(400).json({ message: "reason and requested_end_date are required" });
+  const dbp = db.promise();
+  try {
+    const [[contract]] = await dbp.query(
+      "SELECT contract_id FROM contracts WHERE user_id = ? AND status = 'ACTIVE' LIMIT 1", [req.user.id]);
+    if (!contract) return res.status(404).json({ message: "No active contract found" });
+    // Check no pending request already exists
+    const [[existing]] = await dbp.query(
+      "SELECT request_id FROM termination_requests WHERE user_id = ? AND status = 'PENDING'", [req.user.id]);
+    if (existing) return res.status(409).json({ message: "You already have a pending termination request" });
+    const [result] = await dbp.query(
+      "INSERT INTO termination_requests (user_id, contract_id, reason, requested_end_date) VALUES (?,?,?,?)",
+      [req.user.id, contract.contract_id, reason, requested_end_date]);
+    res.json({ message: "Termination request submitted", requestId: result.insertId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to submit termination request" });
+  }
+});
+
+// Student checks own termination request
+app.get("/api/termination-requests/mine", authMiddleware, requireRole("STUDENT"), async (req, res) => {
+  const dbp = db.promise();
+  try {
+    const [[request]] = await dbp.query(
+      "SELECT * FROM termination_requests WHERE user_id = ? ORDER BY created_at DESC LIMIT 1", [req.user.id]);
+    res.json(request ?? null);
+  } catch { res.status(500).json({ message: "Failed to load termination request" }); }
+});
+
+// Admin gets all termination requests
+app.get("/api/termination-requests", authMiddleware, requireRole("ADMIN"), async (req, res) => {
+  const dbp = db.promise();
+  try {
+    const [rows] = await dbp.query(
+      `SELECT tr.*, u.name AS user_name, u.email AS user_email, r.room_number
+       FROM termination_requests tr
+       LEFT JOIN users u ON tr.user_id = u.user_id
+       LEFT JOIN contracts c ON tr.contract_id = c.contract_id
+       LEFT JOIN rooms r ON c.room_id = r.room_id
+       ORDER BY tr.created_at DESC`);
+    res.json(rows);
+  } catch { res.status(500).json({ message: "Failed to load termination requests" }); }
+});
+
+// Admin accepts a termination request → sets end_date = today + 1 month, status = TERMINATED
+app.patch("/api/termination-requests/:id/accept", authMiddleware, requireRole("ADMIN"), async (req, res) => {
+  const dbp = db.promise();
+  try {
+    const [[request]] = await dbp.query(
+      "SELECT * FROM termination_requests WHERE request_id = ?", [req.params.id]);
+    if (!request) return res.status(404).json({ message: "Request not found" });
+    const minEnd = new Date();
+    minEnd.setMonth(minEnd.getMonth() + 1);
+    const requested = new Date(request.requested_end_date);
+    const endDateStr = (requested > minEnd ? requested : minEnd).toISOString().slice(0, 10);
+    await dbp.query("START TRANSACTION");
+    await dbp.query(
+      "UPDATE contracts SET status = 'TERMINATED', end_date = ? WHERE contract_id = ?",
+      [endDateStr, request.contract_id]);
+    await dbp.query(
+      "UPDATE termination_requests SET status = 'ACCEPTED' WHERE request_id = ?", [req.params.id]);
+    // Free up the room
+    await dbp.query(
+      "UPDATE rooms SET status = 'vacant', resident_id = NULL WHERE resident_id = ?", [request.user_id]);
+    await dbp.query("COMMIT");
+    res.json({ message: "Termination request accepted", end_date: endDateStr });
+  } catch (err) {
+    await dbp.query("ROLLBACK").catch(() => {});
+    console.error(err);
+    res.status(500).json({ message: "Failed to accept termination request" });
+  }
+});
+
+// Admin rejects a termination request
+app.patch("/api/termination-requests/:id/reject", authMiddleware, requireRole("ADMIN"), async (req, res) => {
+  const dbp = db.promise();
+  try {
+    const [result] = await dbp.query(
+      "UPDATE termination_requests SET status = 'REJECTED' WHERE request_id = ?", [req.params.id]);
+    if (!result.affectedRows) return res.status(404).json({ message: "Request not found" });
+    res.json({ message: "Termination request rejected" });
+  } catch { res.status(500).json({ message: "Failed to reject termination request" }); }
+});
+
+// Admin get students with active contracts (for admin-terminate dialog)
+app.get("/api/contracts/active-students", authMiddleware, requireRole("ADMIN"), async (req, res) => {
+  const dbp = db.promise();
+  try {
+    const [rows] = await dbp.query(
+      `SELECT c.contract_id, c.user_id, c.room_id, c.start_date, c.end_date, c.monthly_rent,
+              u.name AS user_name, u.email AS user_email, r.room_number
+       FROM contracts c
+       LEFT JOIN users u ON c.user_id = u.user_id
+       LEFT JOIN rooms r ON c.room_id = r.room_id
+       WHERE c.status = 'ACTIVE'
+       ORDER BY u.name ASC`);
+    res.json(rows);
+  } catch { res.status(500).json({ message: "Failed to load active contracts" }); }
+});
+
+// Admin initiates contract termination directly
+app.post("/api/contracts/admin-terminate", authMiddleware, requireRole("ADMIN"), async (req, res) => {
+  const { contract_id, reason, requested_end_date } = req.body;
+  if (!contract_id || !reason || !requested_end_date)
+    return res.status(400).json({ message: "contract_id, reason and requested_end_date are required" });
+  const dbp = db.promise();
+  try {
+    const [[contract]] = await dbp.query(
+      "SELECT * FROM contracts WHERE contract_id = ? AND status = 'ACTIVE'", [contract_id]);
+    if (!contract) return res.status(404).json({ message: "Active contract not found" });
+    const minEnd = new Date();
+    minEnd.setMonth(minEnd.getMonth() + 1);
+    const requested = new Date(requested_end_date);
+    const endDateStr = (requested > minEnd ? requested : minEnd).toISOString().slice(0, 10);
+    await dbp.query("START TRANSACTION");
+    await dbp.query(
+      "UPDATE contracts SET status = 'TERMINATED', end_date = ?, termination_reason = ? WHERE contract_id = ?",
+      [endDateStr, reason, contract_id]);
+    await dbp.query(
+      "UPDATE rooms SET status = 'vacant', resident_id = NULL WHERE resident_id = ?", [contract.user_id]);
+    await dbp.query("COMMIT");
+    res.json({ message: "Contract terminated", end_date: endDateStr });
+  } catch (err) {
+    await dbp.query("ROLLBACK").catch(() => {});
+    console.error(err);
+    res.status(500).json({ message: "Failed to terminate contract" });
+  }
 });
 
 

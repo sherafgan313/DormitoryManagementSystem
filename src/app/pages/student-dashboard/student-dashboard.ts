@@ -162,6 +162,17 @@ export class StudentDashboardComponent implements OnInit {
     fullDesc: '',
   };
 
+  // ── Termination request ───────────────────────────────────────────
+  myTerminationRequest: any = null;
+  terminationDialog = {
+    open: false,
+    phase: 'form' as 'form' | 'confirm' | 'result',
+    success: false,
+    reason: '',
+    requestedEndDate: '',
+    errorMsg: '',
+  };
+
   constructor(
     private router: Router,
     private api: ApiService,
@@ -184,6 +195,7 @@ export class StudentDashboardComponent implements OnInit {
     this.loadPayments();
     this.loadMyFiles();
     this.loadOverduePayments();
+    this.loadMyTerminationRequest();
   }
 
   // ── Profile ───────────────────────────────────────────────────────
@@ -278,7 +290,7 @@ export class StudentDashboardComponent implements OnInit {
     if (id === 'apply')      this.loadApplications();
     if (id === 'complaints') this.loadComplaints();
     if (id === 'payments')   { this.loadPayments(); this.loadOverduePayments(); }
-    if (id === 'contract')   this.loadMyContract();
+    if (id === 'contract')   { this.loadMyContract(); this.loadMyTerminationRequest(); }
     if (id === 'profile')    this.loadProfile();
     if (id === 'documents')  this.loadMyFiles();
     if (id === 'overview')   { this.loadProfile(); this.loadMyContract(); this.loadOverduePayments(); }
@@ -441,7 +453,8 @@ export class StudentDashboardComponent implements OnInit {
     if (!this.newAppDate) { this.appMsg = 'Please select a preferred start date.'; this.appErr = true; return; }
     this.appLoading = true;
     const filesToUpload = this.allSelectedFiles;
-    this.api.submitApplication(this.newAppDate).subscribe({
+    const appType = this.hasActiveContract ? 'EXTENSION' : 'NEW';
+    this.api.submitApplication(this.newAppDate, appType).subscribe({
       next: (res) => {
         const appId = res.applicationId;
         const resetForm = () => {
@@ -562,6 +575,71 @@ export class StudentDashboardComponent implements OnInit {
 
   closeComplaintDialog(): void {
     this.complaintDialog.open = false;
+    this.cdr.markForCheck();
+  }
+
+  // ── Contract status helpers ────────────────────────────────────────
+  get hasActiveContract(): boolean {
+    return this.contractInfo.status === 'ACTIVE';
+  }
+
+  // ── Termination request ───────────────────────────────────────────
+  loadMyTerminationRequest(): void {
+    this.api.getMyTerminationRequest().subscribe({
+      next: (data) => {
+        this.myTerminationRequest = data;
+        this.cdr.markForCheck();
+      },
+      error: () => {},
+    });
+  }
+
+  openTerminationDialog(): void {
+    this.terminationDialog = {
+      open: true, phase: 'form', success: false,
+      reason: '', requestedEndDate: '', errorMsg: '',
+    };
+    this.cdr.markForCheck();
+  }
+
+  proceedToTerminationConfirm(): void {
+    if (!this.terminationDialog.reason.trim()) {
+      this.terminationDialog.errorMsg = 'Please enter a reason for termination.';
+      this.cdr.markForCheck();
+      return;
+    }
+    if (!this.terminationDialog.requestedEndDate) {
+      this.terminationDialog.errorMsg = 'Please select a requested end date.';
+      this.cdr.markForCheck();
+      return;
+    }
+    this.terminationDialog.errorMsg = '';
+    this.terminationDialog.phase = 'confirm';
+    this.cdr.markForCheck();
+  }
+
+  confirmSubmitTerminationRequest(): void {
+    this.api.submitTerminationRequest(
+      this.terminationDialog.reason.trim(),
+      this.terminationDialog.requestedEndDate
+    ).subscribe({
+      next: () => {
+        this.terminationDialog.phase   = 'result';
+        this.terminationDialog.success = true;
+        this.cdr.markForCheck();
+        this.loadMyTerminationRequest();
+      },
+      error: (err: any) => {
+        this.terminationDialog.phase   = 'result';
+        this.terminationDialog.success = false;
+        this.terminationDialog.errorMsg = err?.error?.message ?? 'Submission failed.';
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  closeTerminationDialog(): void {
+    this.terminationDialog.open = false;
     this.cdr.markForCheck();
   }
 

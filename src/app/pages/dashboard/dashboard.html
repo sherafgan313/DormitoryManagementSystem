@@ -218,35 +218,23 @@
         <div class="section">
           <div class="section__header">
             <div>
-              <h1 class="section__title">Dorm Applications</h1>
-              <p class="section__subtitle">All student applications and their current status.</p>
+              <h1 class="section__title">Residents &amp; Applications</h1>
+              <p class="section__subtitle">Manage applications, extensions, and termination requests.</p>
             </div>
-            <button class="btn-primary" (click)="showAppForm = !showAppForm">
-              @if (showAppForm) {
-                <img src="icons/x-mark.svg" class="icon icon--btn" alt="cancel"> Cancel
-              } @else {
-                <img src="icons/plus.svg" class="icon icon--btn" alt="new"> New Application
-              }
+            <button class="btn--danger" (click)="openAdminTerminateDialog()">
+              <img src="icons/x-mark.svg" class="icon icon--btn" alt="terminate"> Contract Termination
             </button>
           </div>
 
-          @if (showAppForm) {
-            <div class="card form-card">
-              <h3 class="form-card__title">Submit New Application</h3>
-              <div class="form-inline">
-                <div class="field-group">
-                  <label class="field-label">Submission Date</label>
-                  <input type="date" class="field-input" [(ngModel)]="newAppDate" />
-                </div>
-                <button class="btn-primary" (click)="submitApplication()">Submit</button>
-              </div>
-              @if (appMsg) {
-                <div class="alert" [class.alert--success]="!appErr" [class.alert--error]="appErr">
-                  {{ appMsg }}
-                </div>
-              }
-            </div>
-          }
+          <!-- Sub-tabs -->
+          <div class="sub-tabs">
+            <button class="sub-tab" [class.sub-tab--active]="residentsTab === 'new'"
+                    (click)="residentsTab = 'new'">New Applications</button>
+            <button class="sub-tab" [class.sub-tab--active]="residentsTab === 'extension'"
+                    (click)="residentsTab = 'extension'">Extension Requests</button>
+            <button class="sub-tab" [class.sub-tab--active]="residentsTab === 'termination'"
+                    (click)="residentsTab = 'termination'">Termination Requests</button>
+          </div>
 
           @if (appsError) {
             <div class="alert alert--error">
@@ -254,105 +242,193 @@
             </div>
           }
 
-          @if (appsLoading) {
-            <div class="loading-state">Loading applications…</div>
-          } @else {
-            <div class="card table-card">
-              @if (appMsg) {
-                <div class="alert" [class.alert--success]="!appErr" [class.alert--error]="appErr"
-                     style="margin: 0.75rem 1.25rem">
-                  {{ appMsg }}
-                </div>
-              }
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>App ID</th>
-                    <th>Student</th>
-                    <th>Preferred Date</th>
-                    <th>Status</th>
-                    <th>Submitted</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (app of applications; track app.application_id) {
+          <!-- ── New Applications tab ─────────────────────────────── -->
+          @if (residentsTab === 'new') {
+            @if (appsLoading) {
+              <div class="loading-state">Loading applications…</div>
+            } @else {
+              <div class="card table-card">
+                @if (appMsg) {
+                  <div class="alert" [class.alert--success]="!appErr" [class.alert--error]="appErr"
+                       style="margin: 0.75rem 1.25rem">{{ appMsg }}</div>
+                }
+                <table class="data-table">
+                  <thead>
                     <tr>
-                      <td class="td-mono">#{{ app.application_id }}</td>
-                      <td>
-                        <span class="td-name">{{ app.user_name ?? 'User ' + app.user_id }}</span>
-                        @if (app.user_email) {
-                          <span class="td-sub">{{ app.user_email }}</span>
-                        }
-                      </td>
-                      <td>{{ app.submission_date | date:'mediumDate' }}</td>
-                      <td><span class="badge" [ngClass]="badgeClass(app.status)">{{ app.status }}</span></td>
-                      <td class="td-muted">{{ app.created_at | date:'short' }}</td>
-                      <td class="td-actions">
-                        @if (app.status === 'PENDING') {
-                          @if (acceptingAppId === app.application_id) {
-                            <div class="accept-form">
-                              <select class="field-input field-input--sm" [(ngModel)]="selectedRoomId">
-                                <option [value]="0" disabled>Select room…</option>
-                                @for (r of vacantRooms; track r.room_id) {
-                                  <option [value]="r.room_id">{{ r.room_number }} (Fl.{{ r.floor }}, {{ r.type }})</option>
-                                }
-                              </select>
-                              <div class="accept-form__row">
-                                <div>
-                                  <label class="accept-form__label">Start Date</label>
-                                  <input type="date" class="field-input field-input--sm" [(ngModel)]="contractStartDate" />
+                      <th>App ID</th><th>Student</th><th>Preferred Date</th>
+                      <th>Status</th><th>Submitted</th><th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (app of newApplications; track app.application_id) {
+                      <tr>
+                        <td class="td-mono">#{{ app.application_id }}</td>
+                        <td>
+                          <span class="td-name">{{ app.user_name ?? 'User ' + app.user_id }}</span>
+                          @if (app.user_email) { <span class="td-sub">{{ app.user_email }}</span> }
+                        </td>
+                        <td>{{ app.submission_date | date:'mediumDate' }}</td>
+                        <td><span class="badge" [ngClass]="badgeClass(app.status)">{{ app.status }}</span></td>
+                        <td class="td-muted">{{ app.created_at | date:'short' }}</td>
+                        <td class="td-actions">
+                          @if (app.status === 'PENDING') {
+                            @if (acceptingAppId === app.application_id) {
+                              <div class="accept-form">
+                                <select class="field-input field-input--sm" [(ngModel)]="selectedRoomId">
+                                  <option [value]="0" disabled>Select room…</option>
+                                  @for (r of vacantRooms; track r.room_id) {
+                                    <option [value]="r.room_id">{{ r.room_number }} (Fl.{{ r.floor }}, {{ r.type }})</option>
+                                  }
+                                </select>
+                                <div class="accept-form__row">
+                                  <div>
+                                    <label class="accept-form__label">Start Date</label>
+                                    <input type="date" class="field-input field-input--sm" [(ngModel)]="contractStartDate" />
+                                  </div>
+                                  <div>
+                                    <label class="accept-form__label">End Date</label>
+                                    <input type="date" class="field-input field-input--sm" [(ngModel)]="contractEndDate" />
+                                  </div>
                                 </div>
-                                <div>
-                                  <label class="accept-form__label">End Date</label>
-                                  <input type="date" class="field-input field-input--sm" [(ngModel)]="contractEndDate" />
+                                <div class="accept-form__row">
+                                  <div>
+                                    <label class="accept-form__label">Monthly Rent (€)</label>
+                                    <input type="number" class="field-input field-input--sm" placeholder="e.g. 5000"
+                                           [(ngModel)]="contractRent" min="1" />
+                                  </div>
+                                  <div>
+                                    <label class="accept-form__label">Due Day (1–28)</label>
+                                    <input type="number" class="field-input field-input--sm" placeholder="15"
+                                           [(ngModel)]="contractDueDay" min="1" max="28" />
+                                  </div>
+                                </div>
+                                <div class="accept-form__actions">
+                                  <button class="action-btn action-btn--accept" (click)="openAcceptDialog(app.application_id)">
+                                    <img src="icons/check.svg" class="icon icon--sm" alt="confirm"> Confirm &amp; Generate Contract
+                                  </button>
+                                  <button class="action-btn action-btn--reject" (click)="cancelAccept()">
+                                    <img src="icons/x-mark.svg" class="icon icon--sm" alt="cancel"> Cancel
+                                  </button>
                                 </div>
                               </div>
-                              <div class="accept-form__row">
-                                <div>
-                                  <label class="accept-form__label">Monthly Rent (€)</label>
-                                  <input type="number" class="field-input field-input--sm" placeholder="e.g. 5000"
-                                         [(ngModel)]="contractRent" min="1" />
-                                </div>
-                                <div>
-                                  <label class="accept-form__label">Due Day (1–28)</label>
-                                  <input type="number" class="field-input field-input--sm" placeholder="15"
-                                         [(ngModel)]="contractDueDay" min="1" max="28" />
-                                </div>
-                              </div>
-                              <div class="accept-form__actions">
-                                <button class="action-btn action-btn--accept" (click)="openAcceptDialog(app.application_id)">
-                                  <img src="icons/check.svg" class="icon icon--sm" alt="confirm"> Confirm & Generate Contract
-                                </button>
-                                <button class="action-btn action-btn--reject" (click)="cancelAccept()">
-                                  <img src="icons/x-mark.svg" class="icon icon--sm" alt="cancel"> Cancel
-                                </button>
-                              </div>
-                            </div>
-                          } @else {
+                            } @else {
+                              <button class="action-btn action-btn--accept" (click)="startAcceptApplication(app.application_id)">
+                                <img src="icons/check.svg" class="icon icon--sm" alt="accept"> Accept
+                              </button>
+                              <button class="action-btn action-btn--reject" (click)="openRejectDialog(app.application_id)">
+                                <img src="icons/x-mark.svg" class="icon icon--sm" alt="reject"> Reject
+                              </button>
+                            }
+                          } @else if (app.assigned_room_number) {
+                            <span class="td-muted">Room {{ app.assigned_room_number }}</span>
+                          }
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="6" class="table-empty">No new applications.</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+
+          <!-- ── Extension Requests tab ───────────────────────────── -->
+          @if (residentsTab === 'extension') {
+            @if (appsLoading) {
+              <div class="loading-state">Loading applications…</div>
+            } @else {
+              <div class="card table-card">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>App ID</th><th>Student</th><th>Preferred Date</th>
+                      <th>Status</th><th>Submitted</th><th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (app of extensionApplications; track app.application_id) {
+                      <tr>
+                        <td class="td-mono">#{{ app.application_id }}</td>
+                        <td>
+                          <span class="td-name">{{ app.user_name ?? 'User ' + app.user_id }}</span>
+                          @if (app.user_email) { <span class="td-sub">{{ app.user_email }}</span> }
+                        </td>
+                        <td>{{ app.submission_date | date:'mediumDate' }}</td>
+                        <td><span class="badge" [ngClass]="badgeClass(app.status)">{{ app.status }}</span></td>
+                        <td class="td-muted">{{ app.created_at | date:'short' }}</td>
+                        <td class="td-actions">
+                          @if (app.status === 'PENDING') {
                             <button class="action-btn action-btn--accept" (click)="startAcceptApplication(app.application_id)">
                               <img src="icons/check.svg" class="icon icon--sm" alt="accept"> Accept
                             </button>
                             <button class="action-btn action-btn--reject" (click)="openRejectDialog(app.application_id)">
                               <img src="icons/x-mark.svg" class="icon icon--sm" alt="reject"> Reject
                             </button>
+                          } @else {
+                            <span class="td-muted">{{ app.status }}</span>
                           }
-                        } @else if (app.assigned_room_number) {
-                          <span class="td-muted">Room {{ app.assigned_room_number }}</span>
-                        }
-                      </td>
-                    </tr>
-                  } @empty {
-                    <tr>
-                      <td colspan="6" class="table-empty">
-                        No applications found. Connect the backend or submit one above.
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="6" class="table-empty">No extension requests.</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
           }
+
+          <!-- ── Termination Requests tab ─────────────────────────── -->
+          @if (residentsTab === 'termination') {
+            @if (termReqsLoading) {
+              <div class="loading-state">Loading termination requests…</div>
+            } @else {
+              <div class="card table-card">
+                @if (termReqsError) {
+                  <div class="alert alert--error" style="margin:0.75rem 1.25rem">{{ termReqsError }}</div>
+                }
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Req ID</th><th>Student</th><th>Room</th>
+                      <th>Reason</th><th>Requested End</th><th>Status</th><th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (req of terminationRequests; track req.request_id) {
+                      <tr>
+                        <td class="td-mono">#{{ req.request_id }}</td>
+                        <td>
+                          <span class="td-name">{{ req.user_name }}</span>
+                          @if (req.user_email) { <span class="td-sub">{{ req.user_email }}</span> }
+                        </td>
+                        <td>{{ req.room_number ?? '—' }}</td>
+                        <td class="td-muted" style="max-width:200px; white-space:normal">{{ req.reason }}</td>
+                        <td>{{ req.requested_end_date | date:'mediumDate' }}</td>
+                        <td><span class="badge" [ngClass]="badgeClass(req.status)">{{ req.status }}</span></td>
+                        <td class="td-actions">
+                          @if (req.status === 'PENDING') {
+                            <button class="action-btn action-btn--accept" (click)="acceptTermReq(req.request_id)">
+                              <img src="icons/check.svg" class="icon icon--sm" alt="accept"> Accept
+                            </button>
+                            <button class="action-btn action-btn--reject" (click)="rejectTermReq(req.request_id)">
+                              <img src="icons/x-mark.svg" class="icon icon--sm" alt="reject"> Reject
+                            </button>
+                          } @else {
+                            <span class="td-muted">{{ req.status }}</span>
+                          }
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="7" class="table-empty">No termination requests.</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+
         </div>
       }
 
@@ -982,6 +1058,86 @@
             </div>
             <div class="conf-modal__actions">
               <button class="btn-primary" (click)="closeRejectDialog()">Close</button>
+            </div>
+          }
+
+        </div>
+      </div>
+    }
+
+    <!-- ─── ADMIN CONTRACT TERMINATION DIALOG ──────────────────────── -->
+    @if (adminTerminateDialog.open) {
+      <div class="conf-backdrop" (click)="closeAdminTerminateDialog()">
+        <div class="conf-modal" (click)="$event.stopPropagation()">
+          <div class="conf-modal__header">
+            <h3>Terminate Student Contract</h3>
+          </div>
+
+          @if (adminTerminateDialog.phase === 'form') {
+            <div class="conf-modal__body">
+              <p class="conf-modal__lead">Select a student with an active contract to terminate.</p>
+              @if (adminTerminateDialog.errorMsg) {
+                <div class="alert alert--error" style="margin-bottom:0.75rem">{{ adminTerminateDialog.errorMsg }}</div>
+              }
+              @if (adminTerminateDialog.studentsLoading) {
+                <div class="loading-state" style="padding:1rem 0">Loading active contracts…</div>
+              } @else {
+                <div class="field-group">
+                  <label class="field-label">Student</label>
+                  <select class="field-input" [(ngModel)]="adminTerminateDialog.contractId"
+                          (change)="selectTerminateStudentById(adminTerminateDialog.contractId)">
+                    <option [value]="0" disabled>Select student…</option>
+                    @for (s of adminTerminateDialog.students; track s.contract_id) {
+                      <option [value]="s.contract_id">{{ s.user_name }} — Room {{ s.room_number }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="field-group" style="margin-top:0.85rem">
+                  <label class="field-label">Reason for Termination</label>
+                  <textarea class="field-input" rows="4" placeholder="Enter reason…"
+                            [(ngModel)]="adminTerminateDialog.reason"></textarea>
+                </div>
+              }
+            </div>
+            <div class="conf-modal__actions">
+              <button class="btn-secondary" (click)="closeAdminTerminateDialog()">Cancel</button>
+              <button class="btn--danger" (click)="proceedToAdminTerminateConfirm()">Review →</button>
+            </div>
+          }
+
+          @if (adminTerminateDialog.phase === 'confirm') {
+            <div class="conf-modal__body">
+              <p class="conf-modal__lead">Confirm contract termination:</p>
+              <dl class="conf-summary">
+                <dt>Student</dt><dd>{{ adminTerminateDialog.selectedStudent?.user_name }}</dd>
+                <dt>Room</dt><dd>{{ adminTerminateDialog.selectedStudent?.room_number }}</dd>
+                <dt>Effective End</dt><dd>1 month from today (auto-calculated)</dd>
+              </dl>
+              <div class="conf-remark-box" style="margin-top:0.75rem">
+                <span class="conf-remark-label">Reason</span>
+                <p>{{ adminTerminateDialog.reason }}</p>
+              </div>
+            </div>
+            <div class="conf-modal__actions">
+              <button class="btn-secondary" (click)="adminTerminateDialog.phase = 'form'">← Back</button>
+              <button class="btn--danger" (click)="confirmAdminTerminate()">Terminate Contract</button>
+            </div>
+          }
+
+          @if (adminTerminateDialog.phase === 'result') {
+            <div class="conf-modal__body conf-modal__body--result">
+              @if (adminTerminateDialog.success) {
+                <img src="icons/check-circle.svg" class="conf-modal__result-icon conf-modal__result-icon--success" alt="success">
+                <p class="conf-modal__result-title">Contract Terminated</p>
+                <p class="conf-modal__result-msg">The contract has been terminated and room marked vacant.</p>
+              } @else {
+                <img src="icons/exclamation-circle.svg" class="conf-modal__result-icon conf-modal__result-icon--danger" alt="error">
+                <p class="conf-modal__result-title conf-modal__result-title--danger">Termination Failed</p>
+                <p class="conf-modal__result-msg conf-modal__result-msg--danger">{{ adminTerminateDialog.errorMsg }}</p>
+              }
+            </div>
+            <div class="conf-modal__actions">
+              <button class="btn-primary" (click)="closeAdminTerminateDialog()">Close</button>
             </div>
           }
 

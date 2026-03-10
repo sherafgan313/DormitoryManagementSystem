@@ -59,9 +59,9 @@ export class ApiService {
     return this.http.get<any[]>(`${this.BASE}/applications`, { headers: this.headers });
   }
 
-  submitApplication(submission_date: string): Observable<{ message: string; applicationId: number }> {
+  submitApplication(submission_date: string, application_type: 'NEW' | 'EXTENSION' = 'NEW'): Observable<{ message: string; applicationId: number }> {
     return this.http.post<{ message: string; applicationId: number }>(
-      `${this.BASE}/applications`, { submission_date }, { headers: this.headers }
+      `${this.BASE}/applications`, { submission_date, application_type }, { headers: this.headers }
     );
   }
 
@@ -194,6 +194,35 @@ export class ApiService {
 
   cancelReport(id: number): Observable<any> {
     return this.http.delete(`${this.BASE}/reports/${id}`, { headers: this.headers });
+  }
+
+  // ── Termination Requests ──────────────────────────────────────────
+  submitTerminationRequest(reason: string, requested_end_date: string): Observable<any> {
+    return this.http.post(`${this.BASE}/termination-requests`, { reason, requested_end_date }, { headers: this.headers });
+  }
+
+  getMyTerminationRequest(): Observable<any> {
+    return this.http.get<any>(`${this.BASE}/termination-requests/mine`, { headers: this.headers });
+  }
+
+  getTerminationRequests(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.BASE}/termination-requests`, { headers: this.headers });
+  }
+
+  acceptTerminationRequest(id: number): Observable<any> {
+    return this.http.patch(`${this.BASE}/termination-requests/${id}/accept`, {}, { headers: this.headers });
+  }
+
+  rejectTerminationRequest(id: number): Observable<any> {
+    return this.http.patch(`${this.BASE}/termination-requests/${id}/reject`, {}, { headers: this.headers });
+  }
+
+  getActiveContractStudents(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.BASE}/contracts/active-students`, { headers: this.headers });
+  }
+
+  adminTerminateContract(contract_id: number, reason: string, requested_end_date: string): Observable<any> {
+    return this.http.post(`${this.BASE}/contracts/admin-terminate`, { contract_id, reason, requested_end_date }, { headers: this.headers });
   }
 
   // ── Student profile ───────────────────────────────────────────────
