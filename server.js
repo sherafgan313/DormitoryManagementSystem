@@ -299,8 +299,14 @@ async function getAllAdminUserIds() {
 async function pushStudentNotification(userId, dormitoryId, type, message, tab) {
   const dbp = db.promise();
   try {
+    // If dormitory_id wasn't in the JWT (legacy tokens), fall back to the first dormitory
+    let dormId = dormitoryId;
+    if (!dormId) {
+      const [[first]] = await dbp.query("SELECT dormitory_id FROM dormitories LIMIT 1");
+      dormId = first?.dormitory_id;
+    }
     const [[dorm]] = await dbp.query(
-      "SELECT notifications_enabled FROM dormitories WHERE dormitory_id = ?", [dormitoryId]);
+      "SELECT notifications_enabled FROM dormitories WHERE dormitory_id = ?", [dormId]);
     if (!dorm?.notifications_enabled) return;
     await pushNotification(userId, type, message, tab);
   } catch (err) { console.error("pushStudentNotification error:", err.message); }
@@ -425,18 +431,27 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-app.post("/api/login", (req, res) => {
+app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ message: "email and password are required" });
-  db.query("SELECT * FROM users WHERE email = ?", [email], async (err, rows) => {
-    if (err)          return res.status(500).json({ message: "Server error" });
+  try {
+    const [rows] = await db.promise().query("SELECT * FROM users WHERE email = ?", [email]);
     if (!rows.length) return res.status(401).json({ message: "User not found" });
     const user = rows[0];
     if (!await bcrypt.compare(password, user.password_hash))
       return res.status(401).json({ message: "Invalid credentials" });
-    const token = jwt.sign({ id: user.user_id, role: user.role }, SECRET, { expiresIn: "1d" });
-    res.json({ token, role: user.role, userId: user.user_id, name: user.name, email: user.email });
-  });
+    // Look up dormitory_id for admin users so req.user.dormitory_id is available in all routes
+    let dormitory_id = null;
+    if (user.role === 'ADMIN') {
+      const [[ap]] = await db.promise().query(
+        "SELECT dormitory_id FROM admin_profiles WHERE user_id = ?", [user.user_id]);
+      dormitory_id = ap?.dormitory_id ?? null;
+    }
+    const token = jwt.sign({ id: user.user_id, role: user.role, dormitory_id }, SECRET, { expiresIn: "1d" });
+    res.json({ token, role: user.role, userId: user.user_id, name: user.name, email: user.email, dormitory_id });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 
@@ -865,9 +880,10 @@ app.post("/api/complaints", authMiddleware, (req, res) => {
     if (err) return res.status(500).json({ message: "Failed to submit complaint" });
     res.json({ message: "Complaint submitted" });
     // Notify all admins if maintenance alerts are enabled
-    const dormId = req.user.dormitory_id;
+    // Students don't have dormitory_id in JWT, so look it up directly
     db.promise().query(
-      "SELECT maintenance_alerts_enabled FROM dormitories WHERE dormitory_id = ?", [dormId]
+      "SELECT dormitory_id, maintenance_alerts_enabled FROM dormitories WHERE dormitory_id = COALESCE(?, (SELECT dormitory_id FROM dormitories LIMIT 1))",
+      [req.user.dormitory_id ?? null]
     ).then(([[dorm]]) => {
       if (!dorm?.maintenance_alerts_enabled) return;
       getAllAdminUserIds().then(adminIds =>
