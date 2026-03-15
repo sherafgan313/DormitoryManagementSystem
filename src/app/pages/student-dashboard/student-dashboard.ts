@@ -1,9 +1,11 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterOutlet, ActivatedRoute, NavigationEnd } from '@angular/router';
+import { Subscription, filter, startWith } from 'rxjs';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { NotificationService, AppNotification } from '../../services/notification.service';
 
 interface Application {
   application_id: number;
@@ -29,11 +31,11 @@ interface StudentActivity {
 
 @Component({
   selector: 'app-student-dashboard',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterOutlet],
   templateUrl: './student-dashboard.html',
   styleUrl: './student-dashboard.scss',
 })
-export class StudentDashboardComponent implements OnInit {
+export class StudentDashboardComponent implements OnInit, OnDestroy {
   sidebarOpen = true;
   activeNav   = 'overview';
   today       = new Date();
@@ -57,9 +59,11 @@ export class StudentDashboardComponent implements OnInit {
 
   // ── Room & contract ────────────────────────────────────────────────
   roomInfo = { number: '—', floor: 0, type: '—' };
+  contractLoaded = false;
 
   contractInfo = {
     contractId: '—', startDate: '—', endDate: '—',
+    submissionDate: '—', contractCreatedAt: '—',
     status: 'ACTIVE' as 'ACTIVE' | 'EXTENDED' | 'TERMINATED',
     monthlyRent: 0, dueDay: 15,
     hasGeneratedDoc: false, hasSignedDoc: false,
@@ -72,6 +76,7 @@ export class StudentDashboardComponent implements OnInit {
   contractUploading  = false;
 
   nextPayment = { month: '—', amount: 5000, dueDate: '—', daysLeft: 0 };
+  paymentRemindersEnabled = true;
 
   stats = [
     { label: 'My Room',       value: '—', change: 'Not assigned', positive: false, icon: 'home.svg',           color: 'blue'   },
@@ -162,6 +167,14 @@ export class StudentDashboardComponent implements OnInit {
     fullDesc: '',
   };
 
+  // ── Notifications ────────────────────────────────────────────────
+  notifications: AppNotification[] = [];
+  toasts:        AppNotification[] = [];
+  notifPanelOpen = false;
+  private toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  private notifSub?: Subscription;
+  private toastSub?: Subscription;
+
   // ── Termination request ───────────────────────────────────────────
   myTerminationRequest: any = null;
   terminationDialog = {
@@ -175,9 +188,11 @@ export class StudentDashboardComponent implements OnInit {
 
   constructor(
     private router: Router,
+    private route: ActivatedRoute,
     private api: ApiService,
     private auth: AuthService,
     private cdr: ChangeDetectorRef,
+    public notifService: NotificationService,
   ) {}
 
   ngOnInit(): void {
@@ -188,6 +203,16 @@ export class StudentDashboardComponent implements OnInit {
     this.profileForm.name  = savedName;
     this.profileForm.email = savedEmail;
 
+    // Sync activeNav from the child route URL
+    this.router.events.pipe(
+      filter(e => e instanceof NavigationEnd),
+      startWith(null),
+    ).subscribe(() => {
+      const seg = this.route.firstChild?.snapshot.url[0]?.path ?? 'overview';
+      this.activeNav = seg;
+      this.cdr.markForCheck();
+    });
+
     this.loadProfile();
     this.loadMyContract();
     this.loadComplaints();
@@ -196,6 +221,28 @@ export class StudentDashboardComponent implements OnInit {
     this.loadMyFiles();
     this.loadOverduePayments();
     this.loadMyTerminationRequest();
+    this.loadDormitorySettings();
+
+    // Notifications
+    this.notifService.connect();
+    this.notifService.load();
+    this.notifSub = this.notifService.notifications$.subscribe(n => {
+      this.notifications = n;
+      this.cdr.markForCheck();
+    });
+    this.toastSub = this.notifService.toast$.subscribe(n => {
+      this.toasts = [n, ...this.toasts].slice(0, 3);
+      this.cdr.markForCheck();
+      const t = setTimeout(() => this.dismissToast(n), 4000);
+      this.toastTimers.set(n.notification_id, t);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.notifService.disconnect();
+    this.notifSub?.unsubscribe();
+    this.toastSub?.unsubscribe();
+    this.toastTimers.forEach(t => clearTimeout(t));
   }
 
   // ── Profile ───────────────────────────────────────────────────────
@@ -241,6 +288,7 @@ export class StudentDashboardComponent implements OnInit {
     this.api.getContracts().subscribe({
       next: (data) => {
         if (!data) return;
+        this.contractLoaded = true;
         this.contractInfo.contractId      = `CTR-${String(data.contract_id).padStart(3, '0')}`;
         this.contractInfo.status          = data.status ?? 'ACTIVE';
         this.contractInfo.monthlyRent     = Number(data.monthly_rent) || 0;
@@ -252,6 +300,8 @@ export class StudentDashboardComponent implements OnInit {
           this.contractInfo.startDate = new Date(data.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         if (data.end_date)
           this.contractInfo.endDate = new Date(data.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        if (data.created_at)
+          this.contractInfo.contractCreatedAt = new Date(data.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
         if (data.room_number && this.roomInfo.number === '—') {
           this.roomInfo.number   = data.room_number;
@@ -265,7 +315,11 @@ export class StudentDashboardComponent implements OnInit {
 
         const now        = new Date();
         const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        const nextDue    = new Date(now.getFullYear(), now.getMonth() + 1, this.contractInfo.dueDay || 15);
+        const dueDay     = this.contractInfo.dueDay || 15;
+        // Use this month's due date if not yet passed, otherwise next month's
+        const thisDue    = new Date(now.getFullYear(), now.getMonth(), dueDay);
+        const nextDue    = now.getDate() < dueDay ? thisDue
+                         : new Date(now.getFullYear(), now.getMonth() + 1, dueDay);
         const daysLeft   = Math.max(0, Math.ceil((nextDue.getTime() - now.getTime()) / 86400000));
         this.nextPayment = {
           month:   monthNames[nextDue.getMonth()],
@@ -286,7 +340,8 @@ export class StudentDashboardComponent implements OnInit {
   }
 
   setActive(id: string): void {
-    this.activeNav = id;
+    if (this.isNavDisabled(id)) return;
+    this.router.navigate(['/student-dashboard', id]);
     if (id === 'apply')      this.loadApplications();
     if (id === 'complaints') this.loadComplaints();
     if (id === 'payments')   { this.loadPayments(); this.loadOverduePayments(); }
@@ -301,6 +356,51 @@ export class StudentDashboardComponent implements OnInit {
   logout(): void { this.auth.logout(); this.router.navigate(['/login']); }
 
   navigateTo(section: string): void { this.setActive(section); }
+
+  // ── Notification panel ────────────────────────────────────────────
+  @HostListener('document:click')
+  closeNotifPanel(): void {
+    if (this.notifPanelOpen) { this.notifPanelOpen = false; this.cdr.markForCheck(); }
+  }
+
+  toggleNotifPanel(event: Event): void {
+    event.stopPropagation();
+    this.notifPanelOpen = !this.notifPanelOpen;
+    this.cdr.markForCheck();
+  }
+
+  notifIcon(type: string): string {
+    const map: Record<string, string> = {
+      application: 'home.svg', contract: 'clipboard-list.svg',
+      payment: 'credit-card.svg', complaint: 'wrench.svg',
+    };
+    return map[type] ?? 'bell.svg';
+  }
+
+  markRead(id: number): void { this.notifService.markRead(id).subscribe(); }
+
+  markAllRead(): void { this.notifService.markAllRead().subscribe(); }
+
+  onNotifClick(n: AppNotification, event: Event): void {
+    event.stopPropagation();
+    if (!n.is_read) this.notifService.markRead(n.notification_id).subscribe();
+    this.notifPanelOpen = false;
+    this.setActive(n.tab);
+  }
+
+  // ── Toasts ────────────────────────────────────────────────────────
+  dismissToast(n: AppNotification): void {
+    this.toasts = this.toasts.filter(t => t.notification_id !== n.notification_id);
+    const timer = this.toastTimers.get(n.notification_id);
+    if (timer) { clearTimeout(timer); this.toastTimers.delete(n.notification_id); }
+    this.cdr.markForCheck();
+  }
+
+  onToastClick(n: AppNotification): void {
+    this.dismissToast(n);
+    if (!n.is_read) this.notifService.markRead(n.notification_id).subscribe();
+    this.setActive(n.tab);
+  }
 
   badgeClass(status: string): string {
     const map: Record<string, string> = {
@@ -387,8 +487,15 @@ export class StudentDashboardComponent implements OnInit {
   onChecklistFileSelect(event: Event, index: number): void {
     const input = event.target as HTMLInputElement;
     if (!input.files?.length) return;
-    this.checklistItems[index].file = input.files[0];
+    const file = input.files[0];
     input.value = '';
+    if (file.size > 5 * 1024 * 1024) {
+      this.appMsg = `"${file.name}" exceeds the 5 MB limit.`;
+      this.appErr = true;
+      this.cdr.markForCheck();
+      return;
+    }
+    this.checklistItems[index].file = file;
     this.cdr.markForCheck();
   }
 
@@ -401,6 +508,14 @@ export class StudentDashboardComponent implements OnInit {
     const input = event.target as HTMLInputElement;
     if (!input.files) return;
     const existing = new Set(this.extraFiles.map(f => f.name));
+    const oversized = Array.from(input.files).filter(f => f.size > 5 * 1024 * 1024);
+    if (oversized.length) {
+      this.appMsg = `${oversized.map(f => `"${f.name}"`).join(', ')} exceed${oversized.length === 1 ? 's' : ''} the 5 MB limit.`;
+      this.appErr = true;
+      input.value = '';
+      this.cdr.markForCheck();
+      return;
+    }
     Array.from(input.files).filter(f => !existing.has(f.name)).forEach(f => this.extraFiles.push(f));
     input.value = '';
     this.cdr.markForCheck();
@@ -439,6 +554,9 @@ export class StudentDashboardComponent implements OnInit {
       next: (data) => {
         this.applications = data;
         this.appsLoading  = false;
+        const accepted = data.find((a: any) => a.status === 'ACCEPTED');
+        if (accepted?.submission_date)
+          this.contractInfo.submissionDate = new Date(accepted.submission_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         this.cdr.markForCheck();
       },
       error: () => {
@@ -578,9 +696,27 @@ export class StudentDashboardComponent implements OnInit {
     this.cdr.markForCheck();
   }
 
+  loadDormitorySettings(): void {
+    this.api.getDormitorySettings().subscribe({
+      next: (data) => {
+        this.paymentRemindersEnabled = !!data.payment_reminders_enabled;
+        this.cdr.markForCheck();
+      },
+      error: () => {},
+    });
+  }
+
   // ── Contract status helpers ────────────────────────────────────────
   get hasActiveContract(): boolean {
-    return this.contractInfo.status === 'ACTIVE';
+    return this.contractLoaded && (this.contractInfo.status === 'ACTIVE' || this.contractInfo.status === 'EXTENDED');
+  }
+
+  get showRentBanner(): boolean {
+    return this.hasActiveContract && this.paymentRemindersEnabled && this.nextPayment.daysLeft <= 20;
+  }
+
+  isNavDisabled(id: string): boolean {
+    return !this.hasActiveContract && (id === 'contract' || id === 'payments');
   }
 
   // ── Termination request ───────────────────────────────────────────
@@ -693,11 +829,17 @@ export class StudentDashboardComponent implements OnInit {
 
   onSignedContractSelect(event: Event): void {
     const input = event.target as HTMLInputElement;
-    if (input.files?.length) {
-      this.signedContractFile = input.files[0];
-      input.value = '';
+    if (!input.files?.length) return;
+    const file = input.files[0];
+    input.value = '';
+    if (file.size > 10 * 1024 * 1024) {
+      this.contractUploadMsg = `"${file.name}" exceeds the 10 MB limit.`;
+      this.contractUploadErr = true;
       this.cdr.markForCheck();
+      return;
     }
+    this.signedContractFile = file;
+    this.cdr.markForCheck();
   }
 
   removeSignedContract(): void {
@@ -734,11 +876,17 @@ export class StudentDashboardComponent implements OnInit {
 
   onReceiptSelect(event: Event): void {
     const input = event.target as HTMLInputElement;
-    if (input.files?.length) {
-      this.paymentReceipt = input.files[0];
-      input.value = '';
+    if (!input.files?.length) return;
+    const file = input.files[0];
+    input.value = '';
+    if (file.size > 5 * 1024 * 1024) {
+      this.paymentMsg = `"${file.name}" exceeds the 5 MB limit.`;
+      this.paymentErr = true;
       this.cdr.markForCheck();
+      return;
     }
+    this.paymentReceipt = file;
+    this.cdr.markForCheck();
   }
 
   removeReceipt(): void {

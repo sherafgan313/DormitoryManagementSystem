@@ -10,7 +10,14 @@
       "Bash(node:*)",
       "Bash(python:*)",
       "Bash(find \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem\" -name \"*.svg\" 2>/dev/null | head -20)",
-      "Bash(find \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem\" -name \"*.svg\" 2>/dev/null | grep -E \"x-circle|exclamation|check-circle\" | head -10)"
+      "Bash(find \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem\" -name \"*.svg\" 2>/dev/null | grep -E \"x-circle|exclamation|check-circle\" | head -10)",
+      "Bash(cd \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem\" && npm run build 2>&1 | tail -30)",
+      "Bash(cd \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem\" && npm run build 2>&1 | grep -E \"^\\(ERROR|error TS|✘|Application bundle\\)\" | head -20)",
+      "Bash(cd \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem\" && npm run build 2>&1 | grep -E \"error|Error\" | grep -v \"budget\\\\|sass\\\\|deprecated\\\\|WARNING\\\\|SASS\" | head -20)",
+      "Bash(cd \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem\" && npm run build 2>&1 | grep -E \"ERROR\" | head -20)",
+      "Bash(cd \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem\" && node -e \"\nconst fs = require\\('fs'\\);\nconst zlib = require\\('zlib'\\);\n\nconst buf = fs.readFileSync\\('Documentation/Requirements Final.pdf'\\);\nconst str = buf.toString\\('binary'\\);\n\n// Find all FlateDecode stream contents\nconst streamRegex = /stream\\\\r?\\\\n\\([\\\\s\\\\S]*?\\)\\\\r?\\\\nendstream/g;\nlet match;\nlet allText = '';\nlet count = 0;\n\nwhile \\(\\(match = streamRegex.exec\\(str\\)\\) !== null && count < 60\\) {\n  const raw = Buffer.from\\(match[1], 'binary'\\);\n  try {\n    const decompressed = zlib.inflateSync\\(raw\\);\n    const text = decompressed.toString\\('utf8'\\);\n    // Only include if it has actual readable words\n    if \\(/[a-zA-Z]{4,}/.test\\(text\\)\\) {\n      allText += text + '\\\\n---\\\\n';\n      count++;\n    }\n  } catch\\(e\\) {}\n}\n\nconsole.log\\(allText.slice\\(0, 12000\\)\\);\n\" 2>&1)",
+      "Bash(ls -lh \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem/Documentation/\"*.pdf \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem/Documentation/\"*.md 2>&1 && rm \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem/Documentation/_generate_reports.js\")",
+      "Bash(ls -lh \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem/Documentation/\"*.pdf \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem/Documentation/\"*.md && rm \"P:/2nd Sem/Advanced Web/DormitoryManagementSystem/Documentation/_generate_reports.js\")"
     ]
   }
 }

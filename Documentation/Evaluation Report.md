@@ -2,8 +2,8 @@
 
 **Project:** Student Dormitory Management System
 **Module:** Advanced Web Development — University of Hildesheim
-**Branch Evaluated:** `Payments-due-contract`
-**Report Date:** 2026-03-10
+**Branch Evaluated:** `Achieve-all-functional-requirements`
+**Report Date:** 2026-03-15
 
 ---
 
@@ -26,8 +26,8 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Partially Achieved | Backend endpoint `POST /api/register` exists and is functional. However, there is **no registration page in the frontend** — the Angular app only has a `/login` route. Students cannot self-register through the UI; they are created exclusively via seeded demo data. |
-| **Remove** | Shouldn't Remove | Core mandatory requirement. The backend half exists; the frontend form simply needs to be added. |
+| **Achievement** | Fully Achieved | Backend endpoint `POST /api/register` exists and is functional. The Angular app has a `/register` route with a full `RegisterComponent` containing all required fields: name, email, password, confirm password, phone, student ID number, course, and university. The registration page calls `AuthService.register()` which hits the backend API. A link from the login page (`goToRegister()`) navigates to `/register`. |
+| **Remove** | Shouldn't Remove | Core mandatory requirement, correctly implemented end-to-end. |
 
 ---
 
@@ -103,7 +103,7 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | Two-step acceptance flow: click Accept → select vacant room and fill contract details (start/end date, monthly rent, due day) → click "Confirm & Generate Contract" → a confirmation dialog overlay opens (`acceptDialog`) showing a summary → admin confirms → calls `PATCH /api/applications/:id/status` with a transactional room assignment and automatic contract + PDF generation. The dialog has `confirm` and `result` phases with success/error feedback. |
+| **Achievement** | Fully Achieved | Two-step acceptance flow: click Accept → select vacant room and fill contract details (start/end date, monthly rent, due day) → click "Confirm & Generate Contract" → a confirmation dialog overlay opens (`acceptDialog`) showing a summary → admin confirms → calls `PATCH /api/applications/:id/status` with a transactional room assignment and automatic contract + PDF generation. |
 | **Remove** | Shouldn't Remove | Core mandatory requirement. |
 
 ---
@@ -125,7 +125,7 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | `POST /api/applications/:id/files` accepts up to 10 files (PDF/JPG/PNG, 5 MB each) via Multer middleware. Files are stored to `/uploads/applications/` and recorded in `application_files`. `GET /api/my-files` and `GET /api/files/:fileId/download` support retrieval. The student dashboard documents section is backed by these live endpoints, and the application form includes a document checklist with per-file upload controls. |
+| **Achievement** | Fully Achieved | `POST /api/applications/:id/files` accepts up to 10 files (PDF/JPG/PNG, 5 MB each) via Multer middleware. Files are stored to `/uploads/applications/` and recorded in `application_files`. `GET /api/my-files` and `GET /api/files/:fileId/download` support retrieval. The student dashboard documents section is backed by these live endpoints, and the application form includes a document checklist with per-file upload controls. Client-side size validation (5 MB limit per file) is now enforced before upload. |
 | **Remove** | Shouldn't Remove | Core mandatory requirement, correctly implemented. |
 
 ---
@@ -147,7 +147,7 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | `POST /api/contracts/sign` accepts a single PDF file (10 MB limit) via `signedUpload` Multer middleware. One-time-only upload is enforced — the endpoint checks `signed_document_path` before accepting. The signed path is stored in the `contracts` table. The student contract section shows an upload control that disappears once a signed doc is on file. |
+| **Achievement** | Fully Achieved | `POST /api/contracts/sign` accepts a single PDF file (10 MB limit) via `signedUpload` Multer middleware. One-time-only upload enforced server-side. Client-side size validation (10 MB) now rejects oversized files before the request is sent. |
 | **Remove** | Shouldn't Remove | Explicitly stated as a mandatory file upload requirement, correctly implemented. |
 
 ---
@@ -169,7 +169,7 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | `POST /api/payments` accepts a receipt file attachment via `receiptUpload` Multer middleware (5 MB limit), stored to `/uploads/receipts/`. Receipt path is saved to the `rent_payments` table. Admins can download receipts via `GET /api/payments/:id/receipt`. The `ApiService.recordPayment()` method appends the file as `FormData`. |
+| **Achievement** | Fully Achieved | `POST /api/payments` accepts a receipt file attachment via `receiptUpload` Multer middleware (5 MB limit), stored to `/uploads/receipts/`. Receipt path is saved to the `rent_payments` table. Client-side size validation (5 MB) now rejects oversized files before upload. |
 | **Remove** | Shouldn't Remove | Mandatory requirement, correctly implemented. |
 
 ---
@@ -202,8 +202,8 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | Contract extension is handled via the standard application workflow: students submit an `application_type: 'EXTENSION'` application, which the admin reviews in the dedicated **Extension Requests** sub-tab of the residents section. The admin uses the same Accept flow (room + dates + rent → confirmation dialog → contract update) to approve extensions. The DB enum supports `EXTENDED` status. `PATCH /api/contracts/:id/status` with `EXTENDED` is also directly available. The full workflow — student request, admin review, admin approve/reject — is end-to-end implemented. |
-| **Remove** | Shouldn't Remove | Core mandatory requirement, now fully implemented via the extension application workflow and sub-tab. |
+| **Achievement** | Fully Achieved | Contract extension is handled via the standard application workflow: students submit an `application_type: 'EXTENSION'` application, which the admin reviews in the dedicated **Extension Requests** sub-tab of the residents section. The admin uses the same Accept flow (room + dates + rent → confirmation dialog → contract update) to approve extensions. The DB enum supports `EXTENDED` status. |
+| **Remove** | Shouldn't Remove | Core mandatory requirement, fully implemented via the extension application workflow and sub-tab. |
 
 ---
 
@@ -213,8 +213,8 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | Two termination paths exist. (1) Student-initiated: students submit a termination request via `POST /api/termination-requests`, visible in the admin's **Termination Requests** sub-tab; admin can Accept or Reject directly from the table. (2) Admin-initiated: a "Contract Termination" button in the residents section header opens an `adminTerminateDialog` modal — admin selects a student with an active contract, enters a reason, reviews a summary, and confirms via `POST /api/contracts/admin-terminate`. Both paths mark the contract `TERMINATED`, set the end date, and free the room. |
-| **Remove** | Shouldn't Remove | Core mandatory requirement, now fully implemented via both student-initiated and admin-initiated termination flows. |
+| **Achievement** | Fully Achieved | Two termination paths exist. (1) Student-initiated: students submit a termination request via `POST /api/termination-requests`, visible in the admin's **Termination Requests** sub-tab; admin can Accept or Reject directly from the table. (2) Admin-initiated: a "Contract Termination" button opens an `adminTerminateDialog` modal — admin selects a student with an active contract, enters a reason, reviews a summary, and confirms via `POST /api/contracts/admin-terminate`. Both paths mark the contract `TERMINATED`, set the end date, and free the room. |
+| **Remove** | Shouldn't Remove | Core mandatory requirement, fully implemented via both student-initiated and admin-initiated termination flows. |
 
 ---
 
@@ -279,8 +279,8 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | A `complaintDialog` modal overlay is now implemented in `student-dashboard.html`. When the student clicks Submit in the complaint form, `openComplaintDialog()` is called — this validates the input and opens a `conf-backdrop` / `conf-modal` overlay. The dialog has two phases: `confirm` (shows title and description preview with Cancel / Submit Complaint buttons) and `result` (success or failure feedback). The actual `submitComplaint()` API call is only made after the student confirms inside the dialog. |
-| **Remove** | Shouldn't Remove | Explicitly flagged as fulfilling the mandatory dialog window requirement. Now correctly implemented. |
+| **Achievement** | Fully Achieved | A `complaintDialog` modal overlay is implemented in `student-dashboard.html`. When the student clicks Submit in the complaint form, `openComplaintDialog()` validates input and opens a `conf-backdrop` / `conf-modal` overlay. The dialog has two phases: `confirm` (shows title and description preview with Cancel / Submit Complaint buttons) and `result` (success or failure feedback). The actual `submitComplaint()` API call is only made after the student confirms inside the dialog. |
+| **Remove** | Shouldn't Remove | Explicitly flagged as fulfilling the mandatory dialog window requirement. Correctly implemented. |
 
 ---
 
@@ -290,8 +290,8 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | Two separate modal overlay dialogs are now implemented in `dashboard.html`. **Accept dialog** (`acceptDialog`): opened by `openAcceptDialog()` after the inline form is filled; renders as a `conf-backdrop` / `conf-modal` overlay with a contract details summary (student, room, dates, rent, due day), Cancel and Confirm buttons, and a result phase. **Reject dialog** (`rejectDialog`): opened by `openRejectDialog()`; has three phases — `remarks` (enter rejection reason), `confirm` (summary preview), and `result` (success/error feedback). Both dialogs use `(click)="$event.stopPropagation()"` to prevent backdrop-click from accidentally dismissing during the action. |
-| **Remove** | Shouldn't Remove | Companion to R22; both are now implemented as proper dialog window overlays. |
+| **Achievement** | Fully Achieved | Two separate modal overlay dialogs are implemented in `dashboard.html`. **Accept dialog** (`acceptDialog`): renders as a `conf-backdrop` / `conf-modal` overlay with a contract details summary (student, room, dates, rent, due day), Cancel and Confirm buttons, and a result phase. **Reject dialog** (`rejectDialog`): has three phases — `remarks` (enter rejection reason), `confirm` (summary preview), and `result` (success/error feedback). |
+| **Remove** | Shouldn't Remove | Companion to R22; both implemented as proper dialog window overlays. |
 
 ---
 
@@ -301,8 +301,8 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Partially Achieved | Top-level Angular routing is correctly implemented (`/`, `/login`, `/dashboard`, `/student-dashboard`). However, **all section navigation within dashboards uses component-level `activeNav` state** — sidebar menu items call `setActive(id)` which toggles a string, not `RouterLink` or `router.navigate()`. Sections have no unique URLs, cannot be bookmarked, and the Angular router is not used for menu navigation within the application. |
-| **Remove** | Shouldn't Remove | Explicitly highlighted as fulfilling the mandatory router-based menu requirement. Angular child routes must be used. |
+| **Achievement** | Fully Achieved | Top-level Angular routing is implemented (`/`, `/login`, `/register`, `/dashboard`, `/student-dashboard`). All section navigation within both dashboards uses Angular child routes. Sidebar items trigger `router.navigate(['/dashboard', id])`. The URL updates to `/dashboard/rooms`, `/dashboard/payments`, etc. when a section is selected. `activeNav` is synced from the router via `NavigationEnd` events rather than direct mutation. |
+| **Remove** | Shouldn't Remove | Explicitly highlighted as fulfilling the mandatory router-based menu requirement. Now fully implemented. |
 
 ---
 
@@ -312,8 +312,8 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Partially Achieved | Server-side: `requireRole('STUDENT')` guards student-only endpoints (profile, applications, contracts, payments/overdue, termination requests). Client-side: **no Angular `CanActivate` route guards** exist. Any unauthenticated browser user can navigate directly to `/student-dashboard`. |
-| **Remove** | Shouldn't Remove | Mandatory requirement; frontend route guards are missing. |
+| **Achievement** | Fully Achieved | Server-side: `requireRole('STUDENT')` guards student-only endpoints. Client-side: `authGuard` (redirects unauthenticated users to `/login`) and `roleGuard` (redirects wrong-role users to their correct dashboard) are implemented in `src/app/guards/` and applied to `/student-dashboard` via `canActivate: [authGuard, roleGuard]` with `data: { role: 'STUDENT' }`. |
+| **Remove** | Shouldn't Remove | Mandatory requirement, now fully implemented on both frontend and backend. |
 
 ---
 
@@ -323,8 +323,8 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Partially Achieved | Server-side: `requireRole('ADMIN')` guards admin endpoints (stats, rooms, admin profile, termination request management, admin-terminate, active-students). Same frontend gap as R25 — `/dashboard` is accessible without authentication in the browser. |
-| **Remove** | Shouldn't Remove | Mandatory requirement; frontend route guards are missing. |
+| **Achievement** | Fully Achieved | Server-side: `requireRole('ADMIN')` guards admin endpoints. Client-side: same `authGuard` and `roleGuard` are applied to `/dashboard` via `canActivate: [authGuard, roleGuard]` with `data: { role: 'ADMIN' }`. An admin visiting `/student-dashboard` is redirected to `/dashboard` and vice versa. |
+| **Remove** | Shouldn't Remove | Mandatory requirement, now fully implemented on both frontend and backend. |
 
 ---
 
@@ -382,7 +382,7 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Partially Achieved | Payment records show the month column and a month input exists in the payment form. However, no UI filter, search input, or client-side filtering exists to narrow the payment history list by a selected month. |
+| **Achievement** | Partially Achieved | The payment submission form has a month dropdown (`paymentMonth`) used to select which month a payment covers. However, this dropdown is for submission, not for filtering the payment history list. No separate filter, search input, or client-side filtering exists to narrow the displayed payment history by a selected month. |
 | **Remove** | Can Remove | A "Should" requirement. A simple client-side filter would suffice if time permits; it is not critical. |
 
 ---
@@ -393,8 +393,8 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Partially Achieved | Server-side validation is enforced by Multer middleware: application files are restricted to PDF/JPG/PNG at 5 MB; contract uploads to 10 MB; receipt uploads to 5 MB. The student application form shows the hint "PDF, JPG, PNG — max 5 MB each" next to file inputs, and the `accept=".pdf,.jpg,.jpeg,.png"` attribute on `<input type="file">` provides basic browser-level filtering. However, **no explicit client-side size validation** is present — oversized files reach the server before being rejected. |
-| **Remove** | Shouldn't Remove | A "Should" requirement now substantially met. Explicit client-side size checking should be added to complete it. |
+| **Achievement** | Fully Achieved | Server-side validation is enforced by Multer middleware (PDF/JPG/PNG, 5 MB per file; contract 10 MB). Client-side: all four upload handlers (`onChecklistFileSelect`, `onExtraFileSelect`, `onSignedContractSelect`, `onReceiptSelect`) now validate `file.size` before assigning the file. Oversized files are rejected immediately in the browser with a specific error message naming the offending file. The `accept=".pdf,.jpg,.jpeg,.png"` attribute on `<input type="file">` provides browser-level type filtering. |
+| **Remove** | Shouldn't Remove | "Should" requirement, now fully met. |
 
 ---
 
@@ -404,7 +404,7 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | Both dashboards show inline success/error alert boxes after API operations complete. Dialog result phases also display outcome messages (e.g. "Complaint Submitted!", "Application Accepted!", "Contract Terminated"). |
+| **Achievement** | Fully Achieved | Both dashboards show inline success/error alert boxes after API operations complete. Dialog result phases also display outcome messages (e.g. "Complaint Submitted!", "Application Accepted!", "Contract Terminated"). Real-time bell notifications via SSE and toast pop-ups are implemented for both admin and student dashboards. |
 | **Remove** | Shouldn't Remove | Good UX and a "Should" requirement that is met. |
 
 ---
@@ -430,8 +430,8 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Not Achieved | No CSV/Excel export functionality exists. Admin reports are student-facing PDF downloads, not admin data exports. |
-| **Remove** | Can Remove | Optional "Can" requirement. Not a priority given the remaining mandatory gaps. |
+| **Achievement** | Not Achieved | No CSV/Excel export functionality exists. Admin reports are PDF-based; no tabular data export is provided. |
+| **Remove** | Can Remove | Optional "Can" requirement. Not a priority. |
 
 ---
 
@@ -442,7 +442,7 @@
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
 | **Achievement** | Fully Achieved | `GET/PUT /api/profile` is fully implemented. The student dashboard profile section allows editing personal info (name, email, phone) and academic info (Student ID, course, university), saving to DB. |
-| **Remove** | Shouldn't Remove | Already implemented and adds value; no reason to remove. |
+| **Remove** | Shouldn't Remove | Already implemented and adds value. |
 
 ---
 
@@ -456,7 +456,7 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Partially Achieved | Angular 21 is used correctly. Top-level routing (`app.routes.ts`) is implemented with four routes. However, in-dashboard section navigation uses component state (`activeNav` + `setActive()`) instead of Angular child routes, meaning the router is not used for menu navigation within the app — which is the spirit of this requirement. |
+| **Achievement** | Fully Achieved | Angular 21 is used throughout. Top-level routing is implemented with five routes. In-dashboard section navigation now uses Angular child routes (`/dashboard/rooms`, `/dashboard/payments`, etc.) with `DashboardSectionComponent` as the child. `authGuard` and `roleGuard` are applied. The sidebar calls `router.navigate()` and `activeNav` is synced from `ActivatedRoute` via `NavigationEnd` events. |
 | **Remove** | N/A | Technical requirement. |
 
 ---
@@ -467,7 +467,7 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | Express.js + Node.js backend (`server.js`) with MySQL2, JWT, Multer, and PDFKit, serving 35+ REST endpoints with full auth middleware. New endpoints added in this branch: `POST/GET /api/termination-requests`, `PATCH /api/termination-requests/:id/accept`, `PATCH /api/termination-requests/:id/reject`, `GET /api/contracts/active-students`, `POST /api/contracts/admin-terminate`. |
+| **Achievement** | Fully Achieved | Express.js + Node.js backend (`server.js`) with MySQL2, JWT, bcrypt, Multer, and PDFKit, serving 40+ REST endpoints with full auth and role middleware. |
 | **Remove** | N/A | Technical requirement. |
 
 ---
@@ -489,8 +489,8 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Not Achieved | Effective test coverage is near 0%. No E2E tests, no service tests, no component tests. The two existing tests are outdated and test only that the root component renders. |
-| **Remove** | N/A | Technical requirement. This is a significant gap requiring immediate attention. |
+| **Achievement** | Not Achieved | Effective test coverage is near 0%. No E2E tests, no service tests, no component tests. The two existing tests are outdated and test only that the root component renders. This is the most significant remaining gap. |
+| **Remove** | N/A | Technical requirement requiring immediate attention. |
 
 ---
 
@@ -500,7 +500,7 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Not Assessed | Deadline not yet reached at time of this report (2026-03-10). VM preparation and documentation packaging have not been started. |
+| **Achievement** | Not Assessed | Deadline is 2026-03-17. VM preparation and documentation packaging status not evaluated in this report. |
 | **Remove** | N/A | Technical requirement. |
 
 ---
@@ -513,11 +513,11 @@ The following features were implemented beyond what the requirements specify. Ea
 
 ### Multi-Dormitory Support
 
-**What was added:** `dormitory_id` foreign key added to `users`, `rooms`, `applications`, `contracts`, `complaints`, `payments`, `reports`, and `admin_profiles`. All admin API queries filter by `req.user.dormitory_id`. JWT payload includes `dormitory_id`. Two dormitories seeded with separate admins.
+**What was added:** `dormitory_id` foreign key on `users`, `admin_profiles`, `dorm_applications`, `contracts`, `complaints`, `rent_payments`, `reports`, and `dormitories` table. All admin API queries filter by `req.user.dormitory_id`. JWT payload includes `dormitory_id`.
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Remove** | Should Remove | The requirements describe a system for *one* dormitory with two roles. Multi-dormitory support is substantial scope creep — it complicates every API query, the data model, JWT, Multer path handling, and seeding. None of the requirements mention multiple dormitories. This should be stripped back to a single-dormitory model. |
+| **Remove** | Should Remove | The requirements describe a system for *one* dormitory with two roles. Multi-dormitory support complicates every API query, the data model, JWT, and seeding. None of the requirements mention multiple dormitories. This should be stripped back to a single-dormitory model. |
 
 ---
 
@@ -533,21 +533,21 @@ The following features were implemented beyond what the requirements specify. Ea
 
 ### Payment Verification Workflow
 
-**What was added:** `verification_status` column added to `rent_payments` (PENDING_VERIFICATION / VERIFIED / REJECTED). `PATCH /api/payments/:id/verify` and `PATCH /api/payments/:id/reject` endpoints added. Admin dashboard payments section includes verify/reject action buttons and a receipt download option (`GET /api/payments/:id/receipt`).
+**What was added:** `verification_status` column on `rent_payments` (PENDING_VERIFICATION / VERIFIED / REJECTED). `PATCH /api/payments/:id/verify` and `PATCH /api/payments/:id/reject` endpoints. Admin dashboard includes verify/reject buttons and receipt download.
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Remove** | Can Remove | R12 requires only that receipts can be uploaded. R13 requires storage. No requirement asks for an admin payment verification workflow. The feature adds genuine value but also adds complexity (extra API calls, extra DB column, extra UI logic) not asked for in the spec. |
+| **Remove** | Can Remove | R12 requires only that receipts can be uploaded. R13 requires storage. No requirement asks for admin payment verification. The feature adds genuine value but is beyond the stated scope. |
 
 ---
 
 ### Room Management Grid (Admin)
 
-**What was added:** A full rooms grid section in the admin dashboard with floor grouping, status filtering (all/vacant/occupied/maintenance), and room cards showing resident names. Backed by `GET /api/rooms`.
+**What was added:** A full rooms grid section in the admin dashboard with floor grouping, status filtering, room cards with resident names, and maintenance-clearing dialog.
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Remove** | Can Remove | Rooms appear in the requirements only as a detail of application acceptance (room assignment). A dedicated room management grid is not required. However, `GET /api/rooms/vacant` is needed for the acceptance dropdown, so the endpoint must remain. The full grid UI can be removed if simplification is needed. |
+| **Remove** | Can Remove | Rooms appear in the requirements only as a detail of application acceptance (room assignment). A dedicated room management grid is not required. However, `GET /api/rooms/vacant` is needed for the acceptance dropdown, so the endpoint must remain. |
 
 ---
 
@@ -557,57 +557,57 @@ The following features were implemented beyond what the requirements specify. Ea
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Remove** | Can Remove | R09 asks only for "digital contract creation" and R11 for downloadability. The spec does not define what the contract content must contain. The PDFKit dependency is necessary for R14/R17 anyway, but the full legal-clause template is beyond the requirement. A simpler summary page would satisfy R09/R11. |
+| **Remove** | Can Remove | R09 asks only for "digital contract creation" and R11 for downloadability. The PDFKit dependency is necessary for R14/R17 anyway, but the full legal-clause template is beyond the requirement. |
 
 ---
 
 ### Overdue Tracking and Collection Rate Stats
 
-**What was added:** `GET /api/payments/overdue` calculates overdue months based on contract `start_date`, `monthly_rent`, and `due_day`. `GET /api/stats` returns `paidThisMonth`, `totalOutstanding`, `overdueResidentCount`, and `collectionRate`. Student dashboard overview shows next payment info and overdue warnings.
+**What was added:** `GET /api/payments/overdue` calculates overdue months. `GET /api/stats` returns `paidThisMonth`, `totalOutstanding`, `overdueResidentCount`, and `collectionRate`. Student dashboard shows next payment info and overdue warnings.
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Remove** | Can Remove | No requirement specifies overdue tracking, collection rate calculation, or next-payment notifications. These are useful business features but exceed the stated scope. The overdue endpoint (`/api/payments/overdue`) and the related stats fields can be removed if scope needs to be reduced. |
+| **Remove** | Can Remove | No requirement specifies overdue tracking, collection rate calculation, or next-payment notifications. Useful business features but exceed the stated scope. |
+
+---
+
+### Notification System (SSE + Bell + Toasts)
+
+**What was added:** A full real-time notification system using Server-Sent Events (SSE): `notifications` DB table, `pushNotification()` helper, `GET /api/notifications` (load), `PATCH /api/notifications/:id/read` (mark read), `GET /api/events` (SSE stream). Both admin and student dashboards have a bell icon with badge, dropdown panel, and toast pop-ups. Notification preferences (enable/disable per category) stored in the `dormitories` table.
+
+| Metric | Classification | Justification |
+|--------|---------------|---------------|
+| **Remove** | Can Remove | R31 requires only "notification messages after successful actions" (i.e., inline success/error feedback). A full SSE-powered real-time notification system is substantially beyond R31. Consider simplifying to inline messages if codebase size is a concern. |
 
 ---
 
 ### Student Dashboard: "Important Contacts" Card
 
-**What was added:** A card in the student overview section showing dorm admin phone, maintenance number, emergency contact, and office hours. Two fields (`+63 917 000 1234`, `+63 917 000 9999`) remain hardcoded in the component; only the "Dorm Admin" value is dynamic.
+**What was added:** A card in the student overview section showing dorm admin phone, maintenance number, emergency contact, and office hours. Two fields remain hardcoded.
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Remove** | Can Remove | No requirement specifies a contacts card. As a partially hardcoded element it adds no real value and should either be made fully dynamic or removed. |
-
----
-
-### Student Dashboard: 5-Step Contract Timeline
-
-**What was added:** A visual milestone timeline in the student contract section showing 5 stages (Application Submitted → Accepted → Contract Signed → Contract Active → Contract Expiry/Renewal) with hardcoded sample dates.
-
-| Metric | Classification | Justification |
-|--------|---------------|---------------|
-| **Remove** | Can Remove | Not required by the spec. The dates are still hardcoded (Dec 20, 2025 / Jan 5, 2026), so the timeline does not reflect live contract data. It is cosmetic overhead and adds template complexity without delivering dynamic value. |
+| **Remove** | Can Remove | No requirement specifies a contacts card. As a partially hardcoded element it adds no real value. |
 
 ---
 
 ### Termination Request Workflow (Student-Initiated)
 
-**What was added:** A multi-phase `terminationDialog` modal in the student contract section lets students submit a termination request (reason + requested end date) via `POST /api/termination-requests`. Status of the most recent request is displayed inline. Admin sees requests in a dedicated "Termination Requests" sub-tab.
+**What was added:** A multi-phase `terminationDialog` modal in the student contract section lets students submit a termination request (reason + requested end date) via `POST /api/termination-requests`. Admin sees requests in a dedicated "Termination Requests" sub-tab.
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Remove** | Can Remove | R16 only requires that admins can terminate contracts. Providing a formal student-initiated request flow is a UX enhancement beyond the requirement. However, since the feature is now tightly integrated with R16's full implementation (the admin reviews and approves/rejects these requests), removing it would complicate R16. Consider keeping it as it directly supports R16 fulfillment. |
+| **Remove** | Can Remove | R16 only requires that admins can terminate contracts. However, since the feature is tightly integrated with R16's full implementation (admin reviews and approves/rejects these requests), removing it would complicate R16. Consider keeping it as it directly supports R16 fulfillment. |
 
 ---
 
-### GET /api/users Endpoint (Admin Users List)
+### Admin Report Generation (Chart.js + PDFKit)
 
-**What was added:** An endpoint that returns all users for the admin's dormitory.
+**What was added:** Admin dashboard has a "Generate Report" button that renders three Chart.js charts (occupancy doughnut, finances bar, maintenance doughnut) on hidden canvases, extracts base64 PNG, and sends to `POST /api/admin/reports` where PDFKit embeds the images into a formatted admin report PDF.
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Remove** | Can Remove | No requirement asks for a user list. The endpoint exists but no frontend section uses it visibly. It is unused overhead. |
+| **Remove** | Can Remove | R17 specifies the student-facing rent payment report. An admin-facing chart PDF report is an extra. However, the feature demonstrates good use of the required technology stack (PDFKit, long-running task). |
 
 ---
 
@@ -617,7 +617,7 @@ The following features were implemented beyond what the requirements specify. Ea
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Remove** | Can Remove | R04 asks only for "a personal profile for students". Academic fields are extras. They add minimal complexity and are harmless, but strictly speaking are beyond the requirement. |
+| **Remove** | Can Remove | R04 asks only for "a personal profile for students". Academic fields are extras. Minimal complexity and harmless, but strictly speaking beyond the requirement. |
 
 ---
 
@@ -627,37 +627,39 @@ The following features were implemented beyond what the requirements specify. Ea
 
 | Category | Fully Achieved | Partially Achieved | Not Achieved |
 |----------|:-:|:-:|:-:|
-| Must (R01–R25a) | 22 | 4 | 0 |
-| Should (R26–R31) | 5 | 2 | 0 |
+| Must (R01–R25a) | 26 | 0 | 0 |
+| Should (R26–R31) | 5 | 1 | 0 |
 | Can (R32–R34) | 1 | 0 | 2 |
-| Technical (TR01–TR05) | 1 | 1 | 2 + 1 not assessed |
-| **Total** | **29** | **7** | **4 + 1 N/A** |
+| Technical (TR01–TR05) | 2 | 0 | 2 + 1 not assessed |
+| **Total** | **34** | **1** | **4 + 1 N/A** |
 
-### Progress Since Previous Branch (`Multi-Dormitory-Support-&-Full-API-Integration`)
+### Progress Since Previous Branch (`Payments-due-contract`)
 
-| Previously Not/Partially Achieved → Now Fully Achieved |
+| Previously Partially Achieved → Now Fully Achieved |
 |----------------------------------------------|
-| R15 — Contract extension for admins (Extension Requests sub-tab + application workflow) |
-| R16 — Contract termination for admins (admin-terminate dialog + termination requests sub-tab) |
-| R22 — Dialog window for student complaint confirmation (`complaintDialog` modal overlay) |
-| R23 — Dialog window for admin application confirmation (`acceptDialog` + `rejectDialog` modal overlays) |
+| R01 — Student registration (full frontend registration page added) |
+| R24 — Angular child routes for dashboard sections |
+| R25 — Angular route guard for students (`authGuard` + `roleGuard`) |
+| R25a — Angular route guard for admins (`authGuard` + `roleGuard`) |
+| R30 — Client-side file size validation in all four upload handlers |
+| TR01 — Angular router-based navigation (child routes + guards) |
 
-### Remaining Gaps (Must requirements Not Fully Achieved)
+### Remaining Gaps
 
 | ID | Status | Requirement |
 |----|--------|-------------|
-| R01 | Partially | No frontend registration page |
-| R24 | Partially | Dashboard sections not using Angular child routes |
-| R25 | Partially | No Angular route guards for students |
-| R25a | Partially | No Angular route guards for admins |
+| R29 | Partially | Month dropdown exists for payment submission but not for filtering payment history |
+| TR03 | Not Achieved | Tests use Vitest, not Karma; only 2 trivial tests exist |
+| TR04 | Not Achieved | Effective test coverage near 0%; 60%+ required |
+| TR05 | Not Assessed | VM delivery deadline: 2026-03-17 |
 
 ### Remove Summary
 
 | Classification | Count | Key Items |
 |---------------|:-----:|-----------|
 | Should Remove | 2 | Multi-dormitory support, dormitory info editing |
-| Can Remove | 9 | Payment verification workflow, room grid, PDFKit contract clauses, overdue tracking, Important Contacts card, contract timeline (hardcoded dates), student termination request workflow, GET /api/users, academic profile fields |
-| Shouldn't Remove | All core features | Authentication, applications, file uploads, contracts, complaints, payments, reports, profiles, dialog overlays |
+| Can Remove | 9 | Payment verification, room grid, PDFKit contract clauses, overdue tracking, notification system (SSE), Important Contacts card, student termination request workflow, admin chart report, academic profile fields |
+| Shouldn't Remove | All core features | Authentication, registration, applications, file uploads, contracts, complaints, payments, reports, profiles, dialog overlays, child routes, route guards |
 
 ---
 
@@ -665,19 +667,13 @@ The following features were implemented beyond what the requirements specify. Ea
 
 Based on the analysis, the following actions are recommended in priority order:
 
-**Immediate (Mandatory gaps blocking acceptance):**
-1. Add Angular child routes for dashboard sections — covers R24, TR01
-2. Add Angular `CanActivate` route guards for role-based access — covers R25, R25a
-3. Add student registration page in frontend — covers R01
+**Immediate (Remaining mandatory gaps):**
+1. Write Vitest tests targeting 60%+ coverage — covers TR03, TR04
+2. Prepare VirtualBox VM with full setup instructions — covers TR05
 
 **Short-term (Partial implementations to complete):**
-4. Add client-side file size validation in upload forms — completes R30
-5. Fix hardcoded dates in contract timeline (or remove the timeline entirely) — cosmetic accuracy
-6. Add month filter to student payment history — covers R29
-
-**Test Coverage (Technical requirement):**
-7. Write Karma-based (or Vitest) tests targeting 60%+ coverage — covers TR03, TR04
+3. Add month filter to student payment history list — covers R29
 
 **Clean-up (Remove scope creep):**
-8. Strip multi-dormitory support back to single-dormitory model — simplifies entire codebase
-9. Remove or fully dynamicize Important Contacts card (hardcoded phone numbers)
+4. Strip multi-dormitory support back to single-dormitory model — simplifies entire codebase
+5. Remove or fully dynamicize Important Contacts card (hardcoded phone numbers)
