@@ -1147,6 +1147,102 @@ $colors: (
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   REPORT PROGRESS MODAL
+═══════════════════════════════════════════════════════════════════ */
+.report-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.report-modal {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: min(420px, 92vw);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12), 0 24px 64px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+  }
+
+  &__body {
+    padding: 2rem 1.5rem 1rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.85rem;
+  }
+
+  &__spinner { margin-bottom: 0.25rem; }
+
+  &__done-icon { width: 52px; height: 52px; color: var(--success); }
+
+  &__label {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  &__progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--border);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-top: 0.25rem;
+  }
+
+  &__progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 99px;
+    transition: width 0.4s ease;
+    &--done { background: var(--success); }
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+}
+
+.file-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.1rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+  &:hover { opacity: 1; }
+}
+
+.spinner--lg {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border);
+  border-top-color: var(--accent);
+}
+
 @keyframes toast-in {
   from { opacity: 0; transform: translateX(40px); }
   to   { opacity: 1; transform: translateX(0); }

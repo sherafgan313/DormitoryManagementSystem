@@ -6,6 +6,13 @@ import { Subscription, filter, startWith } from 'rxjs';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { NotificationService, AppNotification } from '../../services/notification.service';
+import { NavMenuComponent } from '../../components/nav-menu/nav-menu';
+import { ApplicationComponent } from '../../components/application/application';
+import { ContractComponent } from '../../components/contract/contract';
+import { ComplaintComponent } from '../../components/complaint/complaint';
+import { DocumentsComponent } from '../../components/documents/documents';
+import { ReceiptComponent } from '../../components/receipt/receipt';
+import { ProgressComponent } from '../../components/progress/progress';
 
 interface Application {
   application_id: number;
@@ -31,7 +38,11 @@ interface StudentActivity {
 
 @Component({
   selector: 'app-student-dashboard',
-  imports: [CommonModule, FormsModule, RouterOutlet],
+  imports: [
+    CommonModule, FormsModule, RouterOutlet,
+    NavMenuComponent, ApplicationComponent, ContractComponent,
+    ComplaintComponent, DocumentsComponent, ReceiptComponent, ProgressComponent,
+  ],
   templateUrl: './student-dashboard.html',
   styleUrl: './student-dashboard.scss',
 })

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectorRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
@@ -17,7 +17,7 @@ export class LoginComponent {
   loading = false;
   errorMsg = '';
 
-  constructor(private router: Router, private auth: AuthService) {}
+  constructor(private router: Router, private auth: AuthService, private cdr: ChangeDetectorRef) {}
 
   togglePassword() {
     this.showPassword = !this.showPassword;
@@ -45,6 +45,7 @@ export class LoginComponent {
           this.router.navigate(['/student-dashboard']);
         } else {
           this.errorMsg = 'Invalid email or password.';
+          this.cdr.detectChanges();
         }
       },
     });

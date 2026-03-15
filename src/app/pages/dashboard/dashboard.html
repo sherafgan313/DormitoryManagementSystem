@@ -640,35 +640,7 @@
               <h1 class="section__title">Maintenance & Complaints</h1>
               <p class="section__subtitle">Track and resolve resident complaints and maintenance requests.</p>
             </div>
-            <button class="btn-primary" (click)="showComplaintForm = !showComplaintForm">
-              @if (showComplaintForm) {
-                <img src="icons/x-mark.svg" class="icon icon--btn" alt="cancel"> Cancel
-              } @else {
-                <img src="icons/plus.svg" class="icon icon--btn" alt="new"> New Complaint
-              }
-            </button>
           </div>
-
-          @if (showComplaintForm) {
-            <div class="card form-card">
-              <h3 class="form-card__title">Submit New Complaint</h3>
-              <div class="field-group">
-                <label class="field-label">Description</label>
-                <textarea class="field-input field-textarea"
-                          placeholder="Describe the maintenance issue or complaint…"
-                          [(ngModel)]="newComplaint" rows="3"></textarea>
-              </div>
-              <button class="btn-primary" style="margin-top:0.85rem" (click)="submitComplaint()">
-                Submit Complaint
-              </button>
-              @if (complaintMsg) {
-                <div class="alert" [class.alert--success]="!complaintErr" [class.alert--error]="complaintErr"
-                     style="margin-top:0.75rem">
-                  {{ complaintMsg }}
-                </div>
-              }
-            </div>
-          }
 
           @if (complaintsError) {
             <div class="alert alert--error">
@@ -727,7 +699,7 @@
                   } @empty {
                     <tr>
                       <td colspan="6" class="table-empty">
-                        No complaints found. Connect the backend or submit one above.
+                        No complaints found.
                       </td>
                     </tr>
                   }
@@ -990,17 +962,70 @@
 
     </div><!-- /content -->
 
+    <!-- ─── ADMIN REPORT MODAL ──────────────────────────────────────── -->
+    @if (adminReportModal.open) {
+      <div class="report-modal-backdrop" (click)="closeAdminReportModal()">
+        <div class="report-modal" (click)="$event.stopPropagation()">
+          <div class="report-modal__header">
+            <h3>Generating Report</h3>
+            <button class="file-remove-btn" (click)="closeAdminReportModal()" title="Close">
+              <img src="icons/x-mark.svg" class="icon icon--sm" alt="close">
+            </button>
+          </div>
+
+          <div class="report-modal__body">
+            @if (adminReportModal.status === 'GENERATING' || adminReportModal.status === '') {
+              <div class="report-modal__spinner">
+                <span class="spinner spinner--lg"></span>
+              </div>
+              <p class="report-modal__label">Building your report…</p>
+            } @else if (adminReportModal.status === 'COMPLETED') {
+              <img src="icons/check-circle.svg" class="icon report-modal__done-icon" alt="done">
+              <p class="report-modal__label" style="color: var(--success)">Report ready!</p>
+            } @else if (adminReportModal.status === 'FAILED') {
+              <p class="report-modal__label" style="color: var(--danger)">Generation failed. Please try again.</p>
+            }
+
+            <div class="report-modal__progress-bar">
+              <div class="report-modal__progress-fill"
+                   [style.width.%]="adminReportModal.status === 'COMPLETED' ? 100 : (adminReportModal.status === 'GENERATING' ? 60 : 0)"
+                   [class.report-modal__progress-fill--done]="adminReportModal.status === 'COMPLETED'">
+              </div>
+            </div>
+          </div>
+
+          <div class="report-modal__actions">
+            @if (adminReportModal.status === 'COMPLETED') {
+              <button class="btn-primary" (click)="downloadAdminReportAgain()">
+                <img src="icons/download.svg" class="icon icon--btn" alt="download"> Download PDF
+              </button>
+              <button class="action-btn action-btn--reject" (click)="closeAdminReportModal()">Close</button>
+            } @else if (adminReportModal.status === 'FAILED') {
+              <button class="btn-primary" (click)="closeAdminReportModal()">Close</button>
+            }
+          </div>
+        </div>
+      </div>
+    }
+
     <!-- ─── MAINTENANCE → VACANT DIALOG ─────────────────────────────── -->
     @if (maintenanceDialog.open) {
       <div class="conf-backdrop" (click)="closeMaintenanceDialog()">
-        <div class="conf-dialog" (click)="$event.stopPropagation()">
-          <h3 class="conf-dialog__title">Clear Maintenance Status</h3>
-          <p class="conf-dialog__msg">
-            Mark room <strong>{{ maintenanceDialog.room?.room_number }}</strong> as
-            <strong>Vacant</strong>? This confirms repairs are complete and the room is available for allocation.
-          </p>
-          <div class="conf-dialog__actions">
-            <button class="btn-secondary" (click)="closeMaintenanceDialog()">Cancel</button>
+        <div class="conf-modal" (click)="$event.stopPropagation()">
+          <div class="conf-modal__header">
+            <h3>Clear Maintenance Status</h3>
+            <button class="file-remove-btn" (click)="closeMaintenanceDialog()" title="Close">
+              <img src="icons/x-mark.svg" class="icon icon--sm" alt="close">
+            </button>
+          </div>
+          <div class="conf-modal__body">
+            <p class="conf-modal__lead">
+              Mark room <strong>{{ maintenanceDialog.room?.room_number }}</strong> as
+              <strong>Vacant</strong>? This confirms repairs are complete and the room is available for allocation.
+            </p>
+          </div>
+          <div class="conf-modal__actions">
+            <button class="action-btn action-btn--reject" (click)="closeMaintenanceDialog()">Cancel</button>
             <button class="btn-primary" (click)="confirmClearMaintenance()"
                     [disabled]="maintenanceDialog.loading">
               @if (maintenanceDialog.loading) { <span class="spinner"></span> } @else { Confirm }

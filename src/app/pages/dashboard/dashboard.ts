@@ -7,6 +7,12 @@ import { Chart, registerables } from 'chart.js';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { NotificationService, AppNotification } from '../../services/notification.service';
+import { NavMenuComponent } from '../../components/nav-menu/nav-menu';
+import { ApplicationComponent } from '../../components/application/application';
+import { ContractComponent } from '../../components/contract/contract';
+import { ComplaintComponent } from '../../components/complaint/complaint';
+import { ReceiptComponent } from '../../components/receipt/receipt';
+import { ProgressComponent } from '../../components/progress/progress';
 
 Chart.register(...registerables);
 
@@ -83,7 +89,11 @@ interface RejectDialog {
 
 @Component({
   selector: 'app-dashboard',
-  imports: [CommonModule, FormsModule, RouterOutlet],
+  imports: [
+    CommonModule, FormsModule, RouterOutlet,
+    NavMenuComponent, ApplicationComponent, ContractComponent,
+    ComplaintComponent, ReceiptComponent, ProgressComponent,
+  ],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
@@ -243,6 +253,12 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   reports:        any[] = [];
   reportsLoading  = false;
   reportsError    = '';
+
+  adminReportModal = {
+    open: false,
+    status: '' as '' | 'GENERATING' | 'COMPLETED' | 'FAILED',
+    fileName: '',
+  };
 
   // ── Notifications ─────────────────────────────────────────────────
   notifPanelOpen = false;
@@ -740,9 +756,24 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  closeAdminReportModal(): void {
+    this.adminReportModal.open = false;
+    this.cdr.markForCheck();
+  }
+
+  downloadAdminReportAgain(): void {
+    const link = document.createElement('a');
+    link.href     = this.api.downloadAdminReport(this.adminReportModal.fileName);
+    link.download = this.adminReportModal.fileName;
+    link.click();
+  }
+
   generateAdminReport(): void {
-    this.reportLoading = true;
-    this.reportMsg     = '';
+    this.reportLoading            = true;
+    this.reportMsg                = '';
+    this.adminReportModal.open    = true;
+    this.adminReportModal.status  = 'GENERATING';
+    this.adminReportModal.fileName = '';
     this.cdr.markForCheck();
 
     // Render charts on hidden canvases, then POST to backend
@@ -802,10 +833,12 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       chartImages: { occupancy: occupancyImg, finances: financesImg, maintenance: maintenanceImg },
     }).subscribe({
       next: (res: any) => {
-        this.reportMsg     = 'Report generated successfully!';
-        this.reportErr     = false;
-        this.reportLoading = false;
-        // Trigger download
+        this.reportMsg                 = 'Report generated successfully!';
+        this.reportErr                 = false;
+        this.reportLoading             = false;
+        this.adminReportModal.status   = 'COMPLETED';
+        this.adminReportModal.fileName = res.fileName;
+        // Trigger download automatically
         const link = document.createElement('a');
         link.href  = this.api.downloadAdminReport(res.fileName);
         link.download = res.fileName;
@@ -814,9 +847,10 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         this.loadReports();
       },
       error: () => {
-        this.reportMsg     = 'Failed to generate report. Please try again.';
-        this.reportErr     = true;
-        this.reportLoading = false;
+        this.reportMsg               = 'Failed to generate report. Please try again.';
+        this.reportErr               = true;
+        this.reportLoading           = false;
+        this.adminReportModal.status = 'FAILED';
         this.cdr.markForCheck();
       },
     });
