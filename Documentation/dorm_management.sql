@@ -161,39 +161,7 @@ CREATE TABLE IF NOT EXISTS `dormitories` (
   `payment_reminders_enabled` tinyint(1) NOT NULL DEFAULT '1',
   `maintenance_alerts_enabled` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`dormitory_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
---
--- Dumping data for table `dormitories`
---
-
-INSERT INTO `dormitories` (`dormitory_id`, `name`, `address`, `contact_email`, `contact_phone`, `max_capacity`, `created_at`, `notifications_enabled`, `payment_reminders_enabled`, `maintenance_alerts_enabled`) VALUES
-(1, 'Sunrise Dormitory', '123 University Ave, Manila', 'admin@dms.com', '+49 912 000 1001', 32, '2026-03-10 01:36:30', 1, 1, 1);
-
--- --------------------------------------------------------
-
---
--- Table structure for table `dorm_applications`
---
-
-DROP TABLE IF EXISTS `dorm_applications`;
-CREATE TABLE IF NOT EXISTS `dorm_applications` (
-  `application_id` int NOT NULL AUTO_INCREMENT,
-  `user_id` int NOT NULL,
-  `submission_date` date DEFAULT NULL,
-  `status` enum('PENDING','ACCEPTED','REJECTED') NOT NULL DEFAULT 'PENDING',
-  `assigned_room_id` int DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `application_type` enum('NEW','EXTENSION') NOT NULL DEFAULT 'NEW',
-  `remarks` text,
-  PRIMARY KEY (`application_id`),
-  KEY `user_id` (`user_id`),
-  KEY `assigned_room_id` (`assigned_room_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
---
--- Dumping data for table `dorm_applications`
---
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 INSERT INTO `dorm_applications` (`application_id`, `user_id`, `submission_date`, `status`, `assigned_room_id`, `created_at`, `application_type`, `remarks`) VALUES
 (1, 2, '2025-12-01', 'ACCEPTED', 1, '2026-03-10 01:36:30', 'NEW', NULL),
@@ -218,11 +186,7 @@ CREATE TABLE IF NOT EXISTS `file_metadata` (
   `file_type` varchar(50) DEFAULT NULL,
   `upload_date` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`file_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
---
--- Dumping data for table `file_metadata`
---
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 INSERT INTO `file_metadata` (`file_id`, `file_path`, `file_type`, `upload_date`) VALUES
 (1, '1773106934072-575700.pdf', 'application/pdf', '2026-03-10 01:42:14'),
@@ -243,9 +207,18 @@ INSERT INTO `file_metadata` (`file_id`, `file_path`, `file_type`, `upload_date`)
 
 -- --------------------------------------------------------
 
---
--- Table structure for table `notifications`
---
+CREATE TABLE `users` (
+  `user_id`       int NOT NULL AUTO_INCREMENT,
+  `name`          varchar(100) NOT NULL,
+  `email`         varchar(150) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `role`          enum('STUDENT','ADMIN') NOT NULL,
+  `created_at`    timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `email` (`email`),
+  KEY `dormitory_id` (`dormitory_id`),
+  CONSTRAINT `users_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 DROP TABLE IF EXISTS `notifications`;
 CREATE TABLE IF NOT EXISTS `notifications` (
@@ -375,79 +348,85 @@ CREATE TABLE IF NOT EXISTS `rooms` (
   `resident_id` int DEFAULT NULL,
   PRIMARY KEY (`room_id`),
   UNIQUE KEY `room_number_unique` (`room_number`),
-  KEY `resident_id` (`resident_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=33 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `resident_id` (`resident_id`),
+  CONSTRAINT `rooms_dorm_fk`     FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`),
+  CONSTRAINT `rooms_resident_fk` FOREIGN KEY (`resident_id`)  REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `rooms`
 --
 
-INSERT INTO `rooms` (`room_id`, `room_number`, `floor`, `type`, `status`, `resident_id`) VALUES
-(1, '101', 1, 'Single', 'occupied', 2),
-(2, '102', 1, 'Single', 'vacant', NULL),
-(3, '103', 1, 'Double', 'occupied', 4),
-(4, '104', 1, 'Double', 'vacant', NULL),
-(5, '105', 1, 'Single', 'vacant', NULL),
-(6, '106', 1, 'Double', 'vacant', NULL),
-(7, '107', 1, 'Suite', 'maintenance', NULL),
-(8, '108', 1, 'Double', 'vacant', NULL),
-(9, '201', 2, 'Single', 'vacant', NULL),
-(10, '202', 2, 'Single', 'vacant', NULL),
-(11, '203', 2, 'Double', 'vacant', NULL),
-(12, '204', 2, 'Double', 'vacant', NULL),
-(13, '205', 2, 'Single', 'vacant', NULL),
-(14, '206', 2, 'Double', 'vacant', NULL),
-(15, '207', 2, 'Suite', 'vacant', NULL),
-(16, '208', 2, 'Double', 'vacant', NULL),
-(17, '301', 3, 'Single', 'vacant', NULL),
-(18, '302', 3, 'Single', 'vacant', NULL),
-(19, '303', 3, 'Double', 'vacant', NULL),
-(20, '304', 3, 'Double', 'vacant', NULL),
-(21, '305', 3, 'Single', 'vacant', NULL),
-(22, '306', 3, 'Double', 'vacant', NULL),
-(23, '307', 3, 'Suite', 'vacant', NULL),
-(24, '308', 3, 'Double', 'maintenance', NULL),
-(25, '401', 4, 'Single', 'vacant', NULL),
-(26, '402', 4, 'Single', 'vacant', NULL),
-(27, '403', 4, 'Double', 'vacant', NULL),
-(28, '404', 4, 'Double', 'vacant', NULL),
-(29, '405', 4, 'Single', 'vacant', NULL),
-(30, '406', 4, 'Double', 'vacant', NULL),
-(31, '407', 4, 'Suite', 'vacant', NULL),
-(32, '408', 4, 'Double', 'vacant', NULL);
+CREATE TABLE `admin_profiles` (
+  `admin_profile_id` int NOT NULL AUTO_INCREMENT,
+  `user_id`          int NOT NULL,
+  `dormitory_id`     int NOT NULL,
+  `position`         varchar(100) DEFAULT 'Dormitory Administrator',
+  `phone`            varchar(30)  DEFAULT NULL,
+  PRIMARY KEY (`admin_profile_id`),
+  UNIQUE KEY `user_id` (`user_id`),
+  KEY `dormitory_id` (`dormitory_id`),
+  CONSTRAINT `admin_profiles_user_fk` FOREIGN KEY (`user_id`)      REFERENCES `users` (`user_id`),
+  CONSTRAINT `admin_profiles_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
+-- ─── STUDENT PROFILES ────────────────────────────────────────────────────────
+-- Extended profile for STUDENT users.
+-- room_id is set when the student is accepted.
 
---
--- Table structure for table `student_profiles`
---
-
-DROP TABLE IF EXISTS `student_profiles`;
-CREATE TABLE IF NOT EXISTS `student_profiles` (
-  `profile_id` int NOT NULL AUTO_INCREMENT,
-  `user_id` int NOT NULL,
-  `room_id` int DEFAULT NULL,
-  `phone` varchar(30) DEFAULT NULL,
-  `student_id_number` varchar(50) DEFAULT NULL,
-  `course` varchar(150) DEFAULT NULL,
-  `university` varchar(200) DEFAULT NULL,
-  `academic_details` text,
+CREATE TABLE `student_profiles` (
+  `profile_id`        int NOT NULL AUTO_INCREMENT,
+  `user_id`           int NOT NULL,
+  `room_id`           int DEFAULT NULL,
+  `phone`             varchar(30)  DEFAULT NULL,
+  `student_id_number` varchar(50)  DEFAULT NULL,
+  `course`            varchar(150) DEFAULT NULL,
+  `university`        varchar(200) DEFAULT NULL,
+  `academic_details`  text         DEFAULT NULL,
   `application_status` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`profile_id`),
   UNIQUE KEY `user_id` (`user_id`),
-  KEY `room_id` (`room_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `room_id` (`room_id`),
+  CONSTRAINT `student_profiles_user_fk` FOREIGN KEY (`user_id`)      REFERENCES `users` (`user_id`),
+  CONSTRAINT `student_profiles_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`),
+  CONSTRAINT `student_profiles_room_fk` FOREIGN KEY (`room_id`)      REFERENCES `rooms` (`room_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `student_profiles`
 --
 
-INSERT INTO `student_profiles` (`profile_id`, `user_id`, `room_id`, `phone`, `student_id_number`, `course`, `university`, `academic_details`, `application_status`) VALUES
-(1, 2, 1, '+49 912 345 6789', '2024-10001', 'BS Computer Science', 'University of Munich', NULL, 'ACCEPTED'),
-(2, 3, 2, '+49 912 345 6790', '2024-10002', 'BS Information Technology', 'University of Munich', NULL, 'ACCEPTED'),
-(3, 4, 3, '+49 912 345 6791', '2024-10003', 'BS Nursing', 'University of Munich', NULL, 'ACCEPTED'),
-(5, 5, 5, NULL, NULL, NULL, NULL, NULL, 'ACCEPTED'),
-(6, 7, NULL, '+4917635335083', '2026-0023', 'MS Software Engineering', 'University of Hildesheim', NULL, NULL);
+CREATE TABLE `dorm_applications` (
+  `application_id`  int NOT NULL AUTO_INCREMENT,
+  `user_id`         int NOT NULL,
+  `submission_date` date DEFAULT NULL,
+  `status`          enum('PENDING','ACCEPTED','REJECTED') NOT NULL DEFAULT 'PENDING',
+  `assigned_room_id` int DEFAULT NULL,
+  `created_at`      timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`application_id`),
+  KEY `user_id` (`user_id`),
+  KEY `assigned_room_id` (`assigned_room_id`),
+  CONSTRAINT `dorm_apps_user_fk` FOREIGN KEY (`user_id`)          REFERENCES `users` (`user_id`),
+  CONSTRAINT `dorm_apps_room_fk` FOREIGN KEY (`assigned_room_id`) REFERENCES `rooms` (`room_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ─── CONTRACTS ───────────────────────────────────────────────────────────────
+
+CREATE TABLE `contracts` (
+  `contract_id`            int NOT NULL AUTO_INCREMENT,
+  `user_id`                int NOT NULL,
+  `room_id`                int DEFAULT NULL,
+  `start_date`             date DEFAULT NULL,
+  `end_date`               date DEFAULT NULL,
+  `status`                 enum('ACTIVE','EXTENDED','TERMINATED') NOT NULL DEFAULT 'ACTIVE',
+  `signed_document_file_id` int DEFAULT NULL,
+  PRIMARY KEY (`contract_id`),
+  UNIQUE KEY `user_id` (`user_id`),
+  KEY `room_id` (`room_id`),
+  CONSTRAINT `contracts_user_fk` FOREIGN KEY (`user_id`)      REFERENCES `users` (`user_id`),
+  CONSTRAINT `contracts_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`),
+  CONSTRAINT `contracts_room_fk` FOREIGN KEY (`room_id`)      REFERENCES `rooms` (`room_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -466,21 +445,42 @@ CREATE TABLE IF NOT EXISTS `termination_requests` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`request_id`),
   KEY `user_id` (`user_id`),
-  KEY `contract_id` (`contract_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `dormitory_id` (`dormitory_id`),
+  CONSTRAINT `complaints_user_fk` FOREIGN KEY (`user_id`)      REFERENCES `users` (`user_id`),
+  CONSTRAINT `complaints_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `termination_requests`
 --
 
-INSERT INTO `termination_requests` (`request_id`, `user_id`, `contract_id`, `reason`, `requested_end_date`, `status`, `created_at`) VALUES
-(1, 5, 4, 'dirty dorm', '2026-04-17', 'ACCEPTED', '2026-03-10 12:49:34');
+CREATE TABLE `rent_payments` (
+  `payment_id`     int NOT NULL AUTO_INCREMENT,
+  `user_id`        int DEFAULT NULL,
+  `month`          varchar(20)    DEFAULT NULL,
+  `amount`         decimal(10,2)  DEFAULT NULL,
+  `receipt_file_id` int DEFAULT NULL,
+  `created_at`     timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`payment_id`),
+  KEY `user_id` (`user_id`),
+  KEY `dormitory_id` (`dormitory_id`),
+  CONSTRAINT `payments_user_fk` FOREIGN KEY (`user_id`)      REFERENCES `users` (`user_id`),
+  CONSTRAINT `payments_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
---
--- Table structure for table `users`
---
+CREATE TABLE `reports` (
+  `report_id`       int NOT NULL AUTO_INCREMENT,
+  `generated_by`    int DEFAULT NULL,
+  `generation_date` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `file_path`       varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`report_id`),
+  KEY `generated_by` (`generated_by`),
+  KEY `dormitory_id` (`dormitory_id`),
+  CONSTRAINT `reports_user_fk` FOREIGN KEY (`generated_by`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `reports_dorm_fk` FOREIGN KEY (`dormitory_id`) REFERENCES `dormitories` (`dormitory_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE IF NOT EXISTS `users` (
@@ -494,9 +494,16 @@ CREATE TABLE IF NOT EXISTS `users` (
   UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
---
--- Dumping data for table `users`
---
+CREATE TABLE `application_files` (
+  `id`             int NOT NULL AUTO_INCREMENT,
+  `application_id` int DEFAULT NULL,
+  `file_id`        int DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `application_id` (`application_id`),
+  KEY `file_id` (`file_id`),
+  CONSTRAINT `app_files_app_fk`  FOREIGN KEY (`application_id`) REFERENCES `dorm_applications` (`application_id`),
+  CONSTRAINT `app_files_file_fk` FOREIGN KEY (`file_id`)         REFERENCES `file_metadata` (`file_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 INSERT INTO `users` (`user_id`, `name`, `email`, `password_hash`, `role`, `created_at`) VALUES
 (1, 'Admin User', 'admin@dms.com', '$2b$10$h2x2iufvpX1I7TDY5PIHZOkhh1TLHH5xcXkHHVacp1gunCazKA6ra', 'ADMIN', '2026-03-10 01:36:30'),
@@ -507,9 +514,17 @@ INSERT INTO `users` (`user_id`, `name`, `email`, `password_hash`, `role`, `creat
 (6, 'Rosa Aquino', 'rosa@dms.com', '$2b$10$AScMAam2AJ1W5xGVJeTzKuRbuE0S/nQpsKdQOtRfdah..56qnkwQ2', 'STUDENT', '2026-03-10 01:36:30'),
 (7, 'Sher Afgan', 'sher@gmail.com', '$2b$10$rUdqFDeWLQd7BBkxvTlrQeIx2w.ruxpcE4bPfjymzN7BRTBZAv1VO', 'STUDENT', '2026-03-15 08:00:35');
 
---
--- Constraints for dumped tables
---
+CREATE TABLE `progress` (
+  `progress_id` int NOT NULL AUTO_INCREMENT,
+  `user_id`     int DEFAULT NULL,
+  `task_name`   varchar(100) DEFAULT NULL,
+  `percentage`  int DEFAULT 0,
+  `status`      varchar(50)  DEFAULT NULL,
+  `updated_at`  timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`progress_id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `progress_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Constraints for table `admin_profiles`
