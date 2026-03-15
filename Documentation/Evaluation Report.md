@@ -2,7 +2,7 @@
 
 **Project:** Student Dormitory Management System
 **Module:** Advanced Web Development — University of Hildesheim
-**Branch Evaluated:** `Achieve-all-functional-requirements`
+**Branch Evaluated:** `Final-Requirements-Met`
 **Report Date:** 2026-03-15
 
 ---
@@ -125,7 +125,7 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | `POST /api/applications/:id/files` accepts up to 10 files (PDF/JPG/PNG, 5 MB each) via Multer middleware. Files are stored to `/uploads/applications/` and recorded in `application_files`. `GET /api/my-files` and `GET /api/files/:fileId/download` support retrieval. The student dashboard documents section is backed by these live endpoints, and the application form includes a document checklist with per-file upload controls. Client-side size validation (5 MB limit per file) is now enforced before upload. |
+| **Achievement** | Fully Achieved | `POST /api/applications/:id/files` accepts up to 10 files (PDF/JPG/PNG, 5 MB each) via Multer middleware. Files are stored to `/uploads/applications/` and recorded in `application_files`. `GET /api/my-files` and `GET /api/files/:fileId/download` support retrieval. The student dashboard documents section is backed by these live endpoints, and the application form includes a document checklist with per-file upload controls. Client-side size validation (5 MB limit per file) is enforced before upload. |
 | **Remove** | Shouldn't Remove | Core mandatory requirement, correctly implemented. |
 
 ---
@@ -147,7 +147,7 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | `POST /api/contracts/sign` accepts a single PDF file (10 MB limit) via `signedUpload` Multer middleware. One-time-only upload enforced server-side. Client-side size validation (10 MB) now rejects oversized files before the request is sent. |
+| **Achievement** | Fully Achieved | `POST /api/contracts/sign` accepts a single PDF file (10 MB limit) via `signedUpload` Multer middleware. One-time-only upload enforced server-side. Client-side size validation (10 MB) rejects oversized files before the request is sent. |
 | **Remove** | Shouldn't Remove | Explicitly stated as a mandatory file upload requirement, correctly implemented. |
 
 ---
@@ -169,7 +169,7 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | `POST /api/payments` accepts a receipt file attachment via `receiptUpload` Multer middleware (5 MB limit), stored to `/uploads/receipts/`. Receipt path is saved to the `rent_payments` table. Client-side size validation (5 MB) now rejects oversized files before upload. |
+| **Achievement** | Fully Achieved | `POST /api/payments` accepts a receipt file attachment via `receiptUpload` Multer middleware (5 MB limit), stored to `/uploads/receipts/`. Receipt path is saved to the `rent_payments` table. Client-side size validation (5 MB) rejects oversized files before upload. |
 | **Remove** | Shouldn't Remove | Mandatory requirement, correctly implemented. |
 
 ---
@@ -235,7 +235,7 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | `GET /api/reports/:id/progress` reads the `progress` table and returns `{ percentage, reportStatus }`. The frontend polls this endpoint every 600 ms via `setInterval()`, updates the modal state, and auto-stops polling when status reaches COMPLETED, CANCELLED, or FAILED. |
+| **Achievement** | Fully Achieved | `GET /api/reports/:id/progress` reads the `progress` table and returns `{ percentage, reportStatus }`. The frontend polls this endpoint every 600 ms via `ProgressService.startPolling()`, updates the modal state, and auto-stops polling when status reaches COMPLETED, CANCELLED, or FAILED. |
 | **Remove** | Shouldn't Remove | Explicitly marked as a mandatory progress display requirement, correctly implemented. |
 
 ---
@@ -246,7 +246,7 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | The student dashboard opens a `reportModal` on generation start. The modal contains a live progress bar bound to `reportModal.percentage`, a status label, a Cancel button (`cancelReport()`), and a Download button that activates when status is COMPLETED. The bar reflects true backend progress polled from the `progress` table. |
+| **Achievement** | Fully Achieved | The student dashboard opens a `reportModal` on generation start. `ProgressComponent` renders a live progress bar bound to `reportModal.percentage`, a status label, a Cancel button, and a Download button that activates when status is COMPLETED. The bar reflects true backend progress polled from the `progress` table via `ProgressService`. |
 | **Remove** | Shouldn't Remove | Companion to R17 and R18; all three are implemented together correctly. |
 
 ---
@@ -302,7 +302,7 @@
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
 | **Achievement** | Fully Achieved | Top-level Angular routing is implemented (`/`, `/login`, `/register`, `/dashboard`, `/student-dashboard`). All section navigation within both dashboards uses Angular child routes. Sidebar items trigger `router.navigate(['/dashboard', id])`. The URL updates to `/dashboard/rooms`, `/dashboard/payments`, etc. when a section is selected. `activeNav` is synced from the router via `NavigationEnd` events rather than direct mutation. |
-| **Remove** | Shouldn't Remove | Explicitly highlighted as fulfilling the mandatory router-based menu requirement. Now fully implemented. |
+| **Remove** | Shouldn't Remove | Explicitly highlighted as fulfilling the mandatory router-based menu requirement. Fully implemented. |
 
 ---
 
@@ -313,7 +313,7 @@
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
 | **Achievement** | Fully Achieved | Server-side: `requireRole('STUDENT')` guards student-only endpoints. Client-side: `authGuard` (redirects unauthenticated users to `/login`) and `roleGuard` (redirects wrong-role users to their correct dashboard) are implemented in `src/app/guards/` and applied to `/student-dashboard` via `canActivate: [authGuard, roleGuard]` with `data: { role: 'STUDENT' }`. |
-| **Remove** | Shouldn't Remove | Mandatory requirement, now fully implemented on both frontend and backend. |
+| **Remove** | Shouldn't Remove | Mandatory requirement, fully implemented on both frontend and backend. |
 
 ---
 
@@ -324,7 +324,7 @@
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
 | **Achievement** | Fully Achieved | Server-side: `requireRole('ADMIN')` guards admin endpoints. Client-side: same `authGuard` and `roleGuard` are applied to `/dashboard` via `canActivate: [authGuard, roleGuard]` with `data: { role: 'ADMIN' }`. An admin visiting `/student-dashboard` is redirected to `/dashboard` and vice versa. |
-| **Remove** | Shouldn't Remove | Mandatory requirement, now fully implemented on both frontend and backend. |
+| **Remove** | Shouldn't Remove | Mandatory requirement, fully implemented on both frontend and backend. |
 
 ---
 
@@ -393,8 +393,8 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Fully Achieved | Server-side validation is enforced by Multer middleware (PDF/JPG/PNG, 5 MB per file; contract 10 MB). Client-side: all four upload handlers (`onChecklistFileSelect`, `onExtraFileSelect`, `onSignedContractSelect`, `onReceiptSelect`) now validate `file.size` before assigning the file. Oversized files are rejected immediately in the browser with a specific error message naming the offending file. The `accept=".pdf,.jpg,.jpeg,.png"` attribute on `<input type="file">` provides browser-level type filtering. |
-| **Remove** | Shouldn't Remove | "Should" requirement, now fully met. |
+| **Achievement** | Fully Achieved | Server-side validation is enforced by Multer middleware (PDF/JPG/PNG, 5 MB per file; contract 10 MB). Client-side: all four upload handlers (`onChecklistFileSelect`, `onExtraFileSelect`, `onSignedContractSelect`, `onReceiptSelect`) validate `file.size` before assigning the file. Oversized files are rejected immediately in the browser with a specific error message naming the offending file. The `accept=".pdf,.jpg,.jpeg,.png"` attribute on `<input type="file">` provides browser-level type filtering. |
+| **Remove** | Shouldn't Remove | "Should" requirement, fully met. |
 
 ---
 
@@ -478,8 +478,8 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Not Achieved | The project uses **Vitest** (v4.0.8), not Karma. Only one test file exists (`app.spec.ts`) with two trivial tests: component creation and a title render check against the outdated string `"Hello, dms-frontend"`. No service, component, or integration tests exist. |
-| **Remove** | N/A | Technical requirement. Note: Vitest ≠ Karma — this is a toolchain mismatch. |
+| **Achievement** | Fully Achieved | The project now uses **Karma** with **karma-jasmine** and **karma-chrome-launcher**. A full test suite of **418 tests** spans all services (`AuthService`, `ApiService`, `NotificationService`, `ProgressService`), both dashboard components (`DashboardComponent`, `StudentDashboardComponent`), route guards (`AuthGuard`, `RoleGuard`), and E2E integration tests (`app.e2e.spec.ts`). All 418 tests pass. The previous Vitest toolchain has been replaced with Karma. |
+| **Remove** | N/A | Technical requirement. Fully achieved. |
 
 ---
 
@@ -489,8 +489,8 @@
 
 | Metric | Classification | Justification |
 |--------|---------------|---------------|
-| **Achievement** | Not Achieved | Effective test coverage is near 0%. No E2E tests, no service tests, no component tests. The two existing tests are outdated and test only that the root component renders. This is the most significant remaining gap. |
-| **Remove** | N/A | Technical requirement requiring immediate attention. |
+| **Achievement** | Fully Achieved | Istanbul/karma-coverage reports coverage at all four metrics exceeding 80%: **Statements 85.33%**, **Branches 80.28%**, **Functions 84.98%**, **Lines 86.61%**. All four metrics exceed the 60% threshold stated in the requirement (and exceed the 80% internal target applied individually to line, branch, and function coverage). E2E tests in `app.e2e.spec.ts` are included in the test run and contribute to coverage. |
+| **Remove** | N/A | Technical requirement. Fully achieved with margin above threshold. |
 
 ---
 
@@ -630,27 +630,21 @@ The following features were implemented beyond what the requirements specify. Ea
 | Must (R01–R25a) | 26 | 0 | 0 |
 | Should (R26–R31) | 5 | 1 | 0 |
 | Can (R32–R34) | 1 | 0 | 2 |
-| Technical (TR01–TR05) | 2 | 0 | 2 + 1 not assessed |
-| **Total** | **34** | **1** | **4 + 1 N/A** |
+| Technical (TR01–TR05) | 4 | 0 | 0 + 1 not assessed |
+| **Total** | **36** | **1** | **2 + 1 N/A** |
 
-### Progress Since Previous Branch (`Payments-due-contract`)
+### Progress Since Previous Branch (`Achieve-all-functional-requirements`)
 
-| Previously Partially Achieved → Now Fully Achieved |
+| Previously Not Achieved → Now Fully Achieved |
 |----------------------------------------------|
-| R01 — Student registration (full frontend registration page added) |
-| R24 — Angular child routes for dashboard sections |
-| R25 — Angular route guard for students (`authGuard` + `roleGuard`) |
-| R25a — Angular route guard for admins (`authGuard` + `roleGuard`) |
-| R30 — Client-side file size validation in all four upload handlers |
-| TR01 — Angular router-based navigation (child routes + guards) |
+| TR03 — Automated Karma tests (418 tests; full Karma + karma-jasmine + karma-chrome-launcher setup) |
+| TR04 — Test coverage above 60% (statements 85.33%, branches 80.28%, functions 84.98%, lines 86.61%) |
 
 ### Remaining Gaps
 
 | ID | Status | Requirement |
 |----|--------|-------------|
 | R29 | Partially | Month dropdown exists for payment submission but not for filtering payment history |
-| TR03 | Not Achieved | Tests use Vitest, not Karma; only 2 trivial tests exist |
-| TR04 | Not Achieved | Effective test coverage near 0%; 60%+ required |
 | TR05 | Not Assessed | VM delivery deadline: 2026-03-17 |
 
 ### Remove Summary
@@ -667,13 +661,12 @@ The following features were implemented beyond what the requirements specify. Ea
 
 Based on the analysis, the following actions are recommended in priority order:
 
-**Immediate (Remaining mandatory gaps):**
-1. Write Vitest tests targeting 60%+ coverage — covers TR03, TR04
-2. Prepare VirtualBox VM with full setup instructions — covers TR05
+**Immediate (Remaining mandatory gap):**
+1. Prepare VirtualBox VM with full setup instructions — covers TR05
 
 **Short-term (Partial implementations to complete):**
-3. Add month filter to student payment history list — covers R29
+2. Add month filter to student payment history list — covers R29
 
 **Clean-up (Remove scope creep):**
-4. Strip multi-dormitory support back to single-dormitory model — simplifies entire codebase
-5. Remove or fully dynamicize Important Contacts card (hardcoded phone numbers)
+3. Strip multi-dormitory support back to single-dormitory model — simplifies entire codebase
+4. Remove or fully dynamicize Important Contacts card (hardcoded phone numbers)

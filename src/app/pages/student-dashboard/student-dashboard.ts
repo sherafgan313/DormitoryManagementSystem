@@ -972,6 +972,7 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
   }
 
   cancelReport(): void {
+    if (!this.reportModal.reportId) { return; }
     this.api.cancelReport(this.reportModal.reportId).subscribe({
       next: () => {
         this.reportModal.status = 'CANCELLED';
