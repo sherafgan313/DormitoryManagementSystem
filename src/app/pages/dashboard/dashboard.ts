@@ -1,9 +1,14 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, ChangeDetectorRef, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink, RouterOutlet, ActivatedRoute, NavigationEnd } from '@angular/router';
+import { Subscription, filter, startWith } from 'rxjs';
+import { Chart, registerables } from 'chart.js';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { NotificationService, AppNotification } from '../../services/notification.service';
+
+Chart.register(...registerables);
 
 interface StatCard {
   label: string;
@@ -78,11 +83,11 @@ interface RejectDialog {
 
 @Component({
   selector: 'app-dashboard',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterOutlet],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   sidebarOpen = true;
   activeNav   = 'dashboard';
 
@@ -205,16 +210,31 @@ export class DashboardComponent implements OnInit {
   complaintMsg      = '';
   complaintErr      = false;
 
+  // ── Chart canvas refs ──────────────────────────────────────────────
+  @ViewChild('occupancyCanvas') occupancyCanvasRef!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('financesCanvas')  financesCanvasRef!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('maintenanceCanvas') maintenanceCanvasRef!: ElementRef<HTMLCanvasElement>;
+
+  private chartInstances: Chart[] = [];
+
   // ── Payments ──────────────────────────────────────────────────────
-  months         = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  paymentMonth   = '';
-  paymentAmount: number | null = null;
+  months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  years  = [new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2];
+
+  summaryMonth   = this.months[new Date().getMonth()];
+  summaryYear    = new Date().getFullYear();
+  paymentSummary: any = null;
+  summaryLoading = false;
+  summaryLoaded  = false;
+
   paymentMsg     = '';
   paymentErr     = false;
-  paymentLoading = false;
   payments:       any[] = [];
   paymentsLoading = false;
   paymentsError   = '';
+
+  // ── Room maintenance dialog ────────────────────────────────────────
+  maintenanceDialog = { open: false, room: null as Room | null, loading: false };
 
   // ── Reports ───────────────────────────────────────────────────────
   reportMsg      = '';
@@ -224,6 +244,13 @@ export class DashboardComponent implements OnInit {
   reportsLoading  = false;
   reportsError    = '';
 
+  // ── Notifications ─────────────────────────────────────────────────
+  notifPanelOpen = false;
+  toasts: AppNotification[] = [];
+  private toastTimers = new Map<number, any>();
+  private notifSub?: Subscription;
+  private toastSub?: Subscription;
+
   // ── Admin Profile ─────────────────────────────────────────────────
   adminProfile = {
     name: '', email: '', position: '', phone: '',
@@ -232,19 +259,31 @@ export class DashboardComponent implements OnInit {
   adminProfileLoading = false;
   adminProfileMsg     = '';
   adminProfileErr     = false;
-  notifSettings = { notifications: true, autoReminders: true, maintenanceAlerts: true };
+  notifSettings = { notifications_enabled: true, payment_reminders_enabled: true, maintenance_alerts_enabled: true };
 
   constructor(
     private router: Router,
+    private route: ActivatedRoute,
     private api: ApiService,
     private auth: AuthService,
     private cdr: ChangeDetectorRef,
+    public notifService: NotificationService,
   ) {}
 
   ngOnInit(): void {
     const name = this.auth.getName() ?? 'Admin';
     this.adminName     = name;
     this.adminInitials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+
+    // Sync activeNav from the child route URL
+    this.router.events.pipe(
+      filter(e => e instanceof NavigationEnd),
+      startWith(null),
+    ).subscribe(() => {
+      const seg = this.route.firstChild?.snapshot.url[0]?.path ?? 'dashboard';
+      this.activeNav = seg;
+      this.cdr.markForCheck();
+    });
 
     this.loadAdminStats();
     this.loadRooms();
@@ -255,6 +294,28 @@ export class DashboardComponent implements OnInit {
     this.loadPayments();
     this.loadReports();
     this.loadAdminProfile();
+    this.loadDormitorySettings();
+
+    // Notifications
+    this.notifService.connect();
+    this.notifService.load();
+    this.notifSub = this.notifService.notifications$.subscribe(() => this.cdr.markForCheck());
+    this.toastSub = this.notifService.toast$.subscribe(n => {
+      this.toasts = [n, ...this.toasts];
+      this.cdr.markForCheck();
+      const t = setTimeout(() => this.dismissToast(n), 5000);
+      this.toastTimers.set(n.notification_id, t);
+    });
+  }
+
+  ngAfterViewInit(): void {}
+
+  ngOnDestroy(): void {
+    this.notifService.disconnect();
+    this.notifSub?.unsubscribe();
+    this.toastSub?.unsubscribe();
+    this.toastTimers.forEach(t => clearTimeout(t));
+    this.chartInstances.forEach(c => c.destroy());
   }
 
   get pageName(): string {
@@ -262,7 +323,7 @@ export class DashboardComponent implements OnInit {
   }
 
   setActive(id: string): void {
-    this.activeNav = id;
+    this.router.navigate(['/dashboard', id]);
     if (id === 'dashboard') { this.loadAdminStats(); this.loadActivity(); }
     if (id === 'rooms')      this.loadRooms();
     if (id === 'residents')  { this.loadApplications(); this.loadTerminationRequests(); }
@@ -644,28 +705,18 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  recordPayment(): void {
-    if (!this.paymentMonth || !this.paymentAmount) {
-      this.paymentMsg = 'Please fill in all payment fields.';
-      this.paymentErr = true;
-      return;
-    }
-    this.paymentLoading = true;
-    this.api.recordPayment(this.paymentMonth, this.paymentAmount).subscribe({
-      next: () => {
-        const amt           = this.paymentAmount?.toLocaleString();
-        this.paymentMsg     = `Payment of €${amt} for ${this.paymentMonth} recorded!`;
-        this.paymentErr     = false;
-        this.paymentMonth   = '';
-        this.paymentAmount  = null;
-        this.paymentLoading = false;
+  loadPaymentSummary(): void {
+    this.summaryLoading = true;
+    this.summaryLoaded  = false;
+    this.api.getPaymentSummary(this.summaryMonth, this.summaryYear).subscribe({
+      next: (data) => {
+        this.paymentSummary  = data;
+        this.summaryLoading  = false;
+        this.summaryLoaded   = true;
         this.cdr.markForCheck();
-        this.loadPayments();
       },
       error: () => {
-        this.paymentMsg     = 'Failed to record payment. Please try again.';
-        this.paymentErr     = true;
-        this.paymentLoading = false;
+        this.summaryLoading = false;
         this.cdr.markForCheck();
       },
     });
@@ -689,13 +740,76 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  generateReport(): void {
+  generateAdminReport(): void {
     this.reportLoading = true;
-    this.api.generateReport().subscribe({
-      next: () => {
-        this.reportMsg     = 'Report generated and saved successfully!';
+    this.reportMsg     = '';
+    this.cdr.markForCheck();
+
+    // Render charts on hidden canvases, then POST to backend
+    const buildChartImage = (
+      canvasEl: HTMLCanvasElement,
+      type: 'doughnut' | 'bar',
+      labels: string[],
+      data: number[],
+      colors: string[]
+    ): string => {
+      this.chartInstances.forEach(c => { try { c.destroy(); } catch {} });
+      this.chartInstances = [];
+      const ctx = canvasEl.getContext('2d')!;
+      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      const chart = new Chart(ctx, {
+        type,
+        data: {
+          labels,
+          datasets: [{ data, backgroundColor: colors, borderWidth: 1 }],
+        },
+        options: { animation: false, responsive: false, plugins: { legend: { position: 'bottom' } } },
+      });
+      const b64 = canvasEl.toDataURL('image/png');
+      chart.destroy();
+      return b64;
+    };
+
+    const oCanvas = this.occupancyCanvasRef?.nativeElement;
+    const fCanvas = this.financesCanvasRef?.nativeElement;
+    const mCanvas = this.maintenanceCanvasRef?.nativeElement;
+
+    const s = this.dormStats;
+    const occupancyImg  = oCanvas ? buildChartImage(oCanvas, 'doughnut',
+      ['Occupied', 'Vacant', 'Maintenance'],
+      [s.occupiedRooms ?? 0, s.vacantRooms ?? 0, s.maintenanceRooms ?? 0],
+      ['#10b981', '#3b82f6', '#f59e0b']) : '';
+
+    // For finances we use current payments list by status
+    const verified  = this.payments.filter(p => p.verification_status === 'VERIFIED').length;
+    const pending   = this.payments.filter(p => p.verification_status === 'PENDING_VERIFICATION').length;
+    const rejected  = this.payments.filter(p => p.verification_status === 'REJECTED').length;
+    const financesImg = fCanvas ? buildChartImage(fCanvas, 'bar',
+      ['Verified', 'Pending', 'Rejected'],
+      [verified, pending, rejected],
+      ['#10b981', '#f59e0b', '#ef4444']) : '';
+
+    const submitted  = this.complaints.filter(c => c.status === 'SUBMITTED').length;
+    const inProgress = this.complaints.filter(c => c.status === 'IN_PROGRESS').length;
+    const resolved   = this.complaints.filter(c => c.status === 'RESOLVED').length;
+    const maintenanceImg = mCanvas ? buildChartImage(mCanvas, 'doughnut',
+      ['Submitted', 'In Progress', 'Resolved'],
+      [submitted, inProgress, resolved],
+      ['#f59e0b', '#3b82f6', '#10b981']) : '';
+
+    this.api.generateAdminReport({
+      stats: this.dormStats,
+      chartImages: { occupancy: occupancyImg, finances: financesImg, maintenance: maintenanceImg },
+    }).subscribe({
+      next: (res: any) => {
+        this.reportMsg     = 'Report generated successfully!';
         this.reportErr     = false;
         this.reportLoading = false;
+        // Trigger download
+        const link = document.createElement('a');
+        link.href  = this.api.downloadAdminReport(res.fileName);
+        link.download = res.fileName;
+        link.click();
         this.cdr.markForCheck();
         this.loadReports();
       },
@@ -845,15 +959,37 @@ export class DashboardComponent implements OnInit {
     });
   }
 
+  loadDormitorySettings(): void {
+    this.api.getDormitorySettings().subscribe({
+      next: (data) => {
+        this.notifSettings.notifications_enabled      = !!data.notifications_enabled;
+        this.notifSettings.payment_reminders_enabled  = !!data.payment_reminders_enabled;
+        this.notifSettings.maintenance_alerts_enabled = !!data.maintenance_alerts_enabled;
+        this.cdr.markForCheck();
+      },
+      error: () => {},
+    });
+  }
+
   saveAdminProfile(): void {
     this.api.updateAdminProfile(this.adminProfile).subscribe({
       next: () => {
-        this.adminProfileMsg = 'Profile saved successfully!';
-        this.adminProfileErr = false;
-        this.adminName       = this.adminProfile.name;
-        this.adminInitials   = this.adminProfile.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-        this.cdr.markForCheck();
-        setTimeout(() => { this.adminProfileMsg = ''; this.cdr.markForCheck(); }, 3000);
+        this.adminName     = this.adminProfile.name;
+        this.adminInitials = this.adminProfile.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        // Save notification settings alongside profile
+        this.api.updateDormitorySettings(this.notifSettings).subscribe({
+          next: () => {
+            this.adminProfileMsg = 'Profile saved successfully!';
+            this.adminProfileErr = false;
+            this.cdr.markForCheck();
+            setTimeout(() => { this.adminProfileMsg = ''; this.cdr.markForCheck(); }, 3000);
+          },
+          error: () => {
+            this.adminProfileMsg = 'Profile saved but settings failed to save.';
+            this.adminProfileErr = true;
+            this.cdr.markForCheck();
+          },
+        });
       },
       error: (err: any) => {
         this.adminProfileMsg = err?.error?.message ?? 'Failed to save profile.';
@@ -861,5 +997,85 @@ export class DashboardComponent implements OnInit {
         this.cdr.markForCheck();
       },
     });
+  }
+
+  // ── Room maintenance dialog ────────────────────────────────────────
+  openMaintenanceDialog(room: Room): void {
+    this.maintenanceDialog = { open: true, room, loading: false };
+    this.cdr.markForCheck();
+  }
+
+  closeMaintenanceDialog(): void {
+    this.maintenanceDialog = { open: false, room: null, loading: false };
+    this.cdr.markForCheck();
+  }
+
+  confirmClearMaintenance(): void {
+    if (!this.maintenanceDialog.room) return;
+    this.maintenanceDialog.loading = true;
+    this.cdr.markForCheck();
+    this.api.clearRoomMaintenance(this.maintenanceDialog.room.room_id).subscribe({
+      next: () => {
+        this.closeMaintenanceDialog();
+        this.loadRooms();
+        this.loadAdminStats();
+      },
+      error: () => {
+        this.maintenanceDialog.loading = false;
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  // ── Notification panel ────────────────────────────────────────────
+  @HostListener('document:click')
+  closeNotifPanel(): void {
+    if (this.notifPanelOpen) {
+      this.notifPanelOpen = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  toggleNotifPanel(event: Event): void {
+    event.stopPropagation();
+    this.notifPanelOpen = !this.notifPanelOpen;
+    this.cdr.markForCheck();
+  }
+
+  notifIcon(type: string): string {
+    const icons: Record<string, string> = {
+      application: '📋', contract: '📄', payment: '💳', complaint: '🔧',
+    };
+    return icons[type] ?? '🔔';
+  }
+
+  markRead(id: number, event: Event): void {
+    event.stopPropagation();
+    this.notifService.markRead(id).subscribe();
+  }
+
+  markAllRead(): void {
+    this.notifService.markAllRead().subscribe();
+  }
+
+  onNotifClick(n: AppNotification, event: Event): void {
+    event.stopPropagation();
+    if (!n.is_read) this.notifService.markRead(n.notification_id).subscribe();
+    this.notifPanelOpen = false;
+    this.setActive(n.tab);
+    this.cdr.markForCheck();
+  }
+
+  dismissToast(n: AppNotification): void {
+    clearTimeout(this.toastTimers.get(n.notification_id));
+    this.toastTimers.delete(n.notification_id);
+    this.toasts = this.toasts.filter(t => t.notification_id !== n.notification_id);
+    this.cdr.markForCheck();
+  }
+
+  onToastClick(n: AppNotification): void {
+    this.dismissToast(n);
+    if (!n.is_read) this.notifService.markRead(n.notification_id).subscribe();
+    this.setActive(n.tab);
   }
 }

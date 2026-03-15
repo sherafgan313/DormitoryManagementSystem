@@ -53,6 +53,11 @@
     margin-right: auto;
   }
   &__icon { font-size: 1.4rem; }
+  &__auth {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
   &__links {
     display: flex;
     list-style: none;

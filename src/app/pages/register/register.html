@@ -1,0 +1,215 @@
+<div class="login-page">
+  <!-- Left panel -->
+  <div class="login-page__panel">
+    <div class="login-page__brand" (click)="goHome()">
+      <span class="login-page__brand-icon">
+        <img src="icons/building-office.svg" class="icon icon--brand" alt="DormMS">
+      </span>
+      <span class="login-page__brand-name">DormMS</span>
+    </div>
+    <h2 class="login-page__tagline">Join our dormitory<br />community today.</h2>
+    <ul class="login-page__perks">
+      <li><img src="icons/check-circle.svg" class="icon" alt="check"> Apply for a room online</li>
+      <li><img src="icons/check-circle.svg" class="icon" alt="check"> Track your application status</li>
+      <li><img src="icons/check-circle.svg" class="icon" alt="check"> Manage payments easily</li>
+      <li><img src="icons/check-circle.svg" class="icon" alt="check"> Submit maintenance requests</li>
+    </ul>
+  </div>
+
+  <!-- Right form -->
+  <div class="login-page__form-wrap">
+    <div class="login-card register-card">
+      <div class="login-card__header">
+        <h1 class="login-card__title">Create account</h1>
+        <p class="login-card__sub">Register as a student resident</p>
+      </div>
+
+      <form class="login-form" (ngSubmit)="onSubmit()" #regForm="ngForm" novalidate>
+        @if (errorMsg) {
+          <div class="login-form__error">
+            <img src="icons/exclamation-triangle.svg" class="icon" alt="error"> {{ errorMsg }}
+          </div>
+        }
+        @if (successMsg) {
+          <div class="login-form__success">
+            <img src="icons/check-circle.svg" class="icon" alt="success"> {{ successMsg }}
+          </div>
+        }
+
+        <!-- Section: Account Info -->
+        <div class="register-section-label">Account Information</div>
+
+        <div class="form-group">
+          <label class="form-label" for="name">Full Name <span class="required">*</span></label>
+          <div class="form-input-wrap">
+            <span class="form-input-icon">
+              <img src="icons/user.svg" class="icon" alt="name">
+            </span>
+            <input
+              id="name"
+              type="text"
+              class="form-input"
+              placeholder="Juan dela Cruz"
+              [(ngModel)]="name"
+              name="name"
+              autocomplete="name"
+              required
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address <span class="required">*</span></label>
+          <div class="form-input-wrap">
+            <span class="form-input-icon">
+              <img src="icons/envelope.svg" class="icon" alt="email">
+            </span>
+            <input
+              id="email"
+              type="email"
+              class="form-input"
+              placeholder="you@example.com"
+              [(ngModel)]="email"
+              name="email"
+              autocomplete="email"
+              required
+            />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="password">Password <span class="required">*</span></label>
+            <div class="form-input-wrap">
+              <span class="form-input-icon">
+                <img src="icons/lock-closed.svg" class="icon" alt="password">
+              </span>
+              <input
+                id="password"
+                [type]="showPassword ? 'text' : 'password'"
+                class="form-input form-input--padded-right"
+                placeholder="Min. 6 characters"
+                [(ngModel)]="password"
+                name="password"
+                autocomplete="new-password"
+                required
+              />
+              <button type="button" class="form-input-toggle" (click)="togglePassword()">
+                <img [src]="showPassword ? 'icons/eye-slash.svg' : 'icons/eye.svg'" class="icon" alt="toggle">
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="confirmPassword">Confirm Password <span class="required">*</span></label>
+            <div class="form-input-wrap">
+              <span class="form-input-icon">
+                <img src="icons/lock-closed.svg" class="icon" alt="confirm password">
+              </span>
+              <input
+                id="confirmPassword"
+                [type]="showConfirmPassword ? 'text' : 'password'"
+                class="form-input form-input--padded-right"
+                placeholder="Repeat password"
+                [(ngModel)]="confirmPassword"
+                name="confirmPassword"
+                autocomplete="new-password"
+                required
+              />
+              <button type="button" class="form-input-toggle" (click)="toggleConfirmPassword()">
+                <img [src]="showConfirmPassword ? 'icons/eye-slash.svg' : 'icons/eye.svg'" class="icon" alt="toggle">
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Student Info -->
+        <div class="register-section-label">Student Information</div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="phone">Phone Number</label>
+            <div class="form-input-wrap">
+              <span class="form-input-icon">
+                <img src="icons/phone.svg" class="icon" alt="phone">
+              </span>
+              <input
+                id="phone"
+                type="tel"
+                class="form-input"
+                placeholder="09xxxxxxxxx"
+                [(ngModel)]="phone"
+                name="phone"
+                autocomplete="tel"
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="studentIdNumber">Student ID Number</label>
+            <div class="form-input-wrap">
+              <span class="form-input-icon">
+                <img src="icons/identification.svg" class="icon" alt="student id">
+              </span>
+              <input
+                id="studentIdNumber"
+                type="text"
+                class="form-input"
+                placeholder="e.g. 2021-00001"
+                [(ngModel)]="studentIdNumber"
+                name="studentIdNumber"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="course">Course / Program</label>
+          <div class="form-input-wrap">
+            <span class="form-input-icon">
+              <img src="icons/academic-cap.svg" class="icon" alt="course">
+            </span>
+            <input
+              id="course"
+              type="text"
+              class="form-input"
+              placeholder="e.g. BS Computer Science"
+              [(ngModel)]="course"
+              name="course"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="university">University / School</label>
+          <div class="form-input-wrap">
+            <span class="form-input-icon">
+              <img src="icons/building-office.svg" class="icon" alt="university">
+            </span>
+            <input
+              id="university"
+              type="text"
+              class="form-input"
+              placeholder="e.g. University of the Philippines"
+              [(ngModel)]="university"
+              name="university"
+            />
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn--primary btn--full" [disabled]="loading">
+          @if (loading) {
+            <span class="spinner"></span> Creating account…
+          } @else {
+            Create Account
+          }
+        </button>
+      </form>
+
+      <p class="login-card__hint register-link">
+        Already have an account?
+        <a class="register-link__anchor" (click)="goToLogin()">Sign in</a>
+      </p>
+    </div>
+  </div>
+</div>

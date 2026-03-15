@@ -46,9 +46,47 @@
         <span class="topbar__page">{{ pageName }}</span>
       </div>
       <div class="topbar__right">
-        <button class="topbar__icon-btn" title="Notifications">
-          <img src="icons/bell.svg" class="icon" alt="notifications">
-        </button>
+        <!-- Notification bell -->
+        <div class="notif-wrapper" (click)="$event.stopPropagation()">
+          <button class="topbar__icon-btn" title="Notifications" (click)="toggleNotifPanel($event)">
+            <img src="icons/bell.svg" class="icon" alt="notifications">
+            @if (notifService.unreadCount > 0) {
+              <span class="notif-badge">{{ notifService.unreadCount > 9 ? '9+' : notifService.unreadCount }}</span>
+            }
+          </button>
+
+          @if (notifPanelOpen) {
+            <div class="notif-panel">
+              <div class="notif-panel__header">
+                <span class="notif-panel__title">Notifications</span>
+                @if (notifService.unreadCount > 0) {
+                  <button class="notif-panel__mark-all" (click)="markAllRead()">Mark all read</button>
+                }
+              </div>
+              <div class="notif-panel__list">
+                @if ((notifService.notifications$ | async)?.length === 0) {
+                  <div class="notif-empty">No notifications yet.</div>
+                }
+                @for (n of (notifService.notifications$ | async) ?? []; track n.notification_id) {
+                  <div
+                    class="notif-item"
+                    [class.notif-item--unread]="!n.is_read"
+                    (click)="onNotifClick(n, $event)"
+                  >
+                    <span class="notif-item__icon">{{ notifIcon(n.type) }}</span>
+                    <div class="notif-item__body">
+                      <p class="notif-item__msg">{{ n.message }}</p>
+                      <span class="notif-item__time">{{ timeAgo(n.created_at) }}</span>
+                    </div>
+                    @if (!n.is_read) {
+                      <button class="notif-item__read-btn" (click)="markRead(n.notification_id, $event)" title="Mark as read">✓</button>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
         <div class="topbar__avatar"><span>{{ adminInitials }}</span></div>
         <div class="topbar__user">
           <span class="topbar__user-name">{{ adminName }}</span>
@@ -191,7 +229,9 @@
                 <h3 class="floor-title">Floor {{ floor }}</h3>
                 <div class="room-grid">
                   @for (room of roomsOnFloor(floor); track room.room_id) {
-                    <div class="room-card room-card--{{ room.status }}">
+                    <div class="room-card room-card--{{ room.status }}"
+                         [class.room-card--clickable]="room.status === 'maintenance'"
+                         (click)="room.status === 'maintenance' && openMaintenanceDialog(room)">
                       <div class="room-card__number">{{ room.room_number }}</div>
                       <div class="room-card__type">{{ room.type }}</div>
                       @if (room.status === 'occupied') {
@@ -203,6 +243,7 @@
                       } @else {
                         <div class="room-card__resident room-card__resident--empty">Under Repair</div>
                         <span class="badge badge--danger">Maintenance</span>
+                        <div class="room-card__hint">Click to clear</div>
                       }
                     </div>
                   }
@@ -443,71 +484,75 @@
           </div>
 
           <div class="two-col">
-            <!-- Payment form -->
+            <!-- Load Summary form -->
             <div class="card form-card">
               <h3 class="form-card__title">
-                <img src="icons/credit-card.svg" class="icon icon--title" alt="payment"> Record Payment
+                <img src="icons/credit-card.svg" class="icon icon--title" alt="summary"> Load Summary
               </h3>
               <div class="field-group">
                 <label class="field-label">Month</label>
-                <select class="field-input" [(ngModel)]="paymentMonth">
-                  <option value="" disabled>Select month…</option>
+                <select class="field-input" [(ngModel)]="summaryMonth">
                   @for (m of months; track m) {
                     <option [value]="m">{{ m }}</option>
                   }
                 </select>
               </div>
               <div class="field-group" style="margin-top:0.85rem">
-                <label class="field-label">Amount (€)</label>
-                <input type="number" class="field-input" placeholder="e.g. 5000"
-                       [(ngModel)]="paymentAmount" min="1" />
+                <label class="field-label">Year</label>
+                <select class="field-input" [(ngModel)]="summaryYear">
+                  @for (y of years; track y) {
+                    <option [value]="y">{{ y }}</option>
+                  }
+                </select>
               </div>
               <button class="btn-primary btn-full" style="margin-top:1.1rem"
-                      (click)="recordPayment()" [disabled]="paymentLoading">
-                @if (paymentLoading) { <span class="spinner"></span> Recording… }
-                @else { Record Payment }
+                      (click)="loadPaymentSummary()" [disabled]="summaryLoading">
+                @if (summaryLoading) { <span class="spinner"></span> Loading… }
+                @else { Find Summary }
               </button>
-              @if (paymentMsg) {
-                <div class="alert" [class.alert--success]="!paymentErr" [class.alert--error]="paymentErr"
-                     style="margin-top:0.85rem">
-                  {{ paymentMsg }}
-                </div>
-              }
             </div>
 
             <!-- Payment summary -->
             <div class="card">
               <div class="card__header">
                 <h3 class="card__title">Summary</h3>
-                <span class="card__badge">{{ dormStats.currentMonth }}</span>
+                @if (summaryLoaded) {
+                  <span class="card__badge">{{ paymentSummary.month }} {{ paymentSummary.year }}</span>
+                }
               </div>
-              <div class="summary-row">
-                <span class="summary-label">Paid this month</span>
-                <span class="summary-value summary-value--success">
-                  €{{ (dormStats.paidThisMonth ?? 0) | number:'1.2-2' }}
-                </span>
-              </div>
-              <div class="summary-row">
-                <span class="summary-label">Pending verification</span>
-                <span class="summary-value summary-value--warning">
-                  €{{ (dormStats.totalOutstanding ?? 0) | number:'1.2-2' }}
-                </span>
-              </div>
-              <div class="summary-row">
-                <span class="summary-label">Overdue last month</span>
-                <span class="summary-value"
-                      [class.summary-value--danger]="(dormStats.overdueResidentCount ?? 0) > 0">
-                  {{ dormStats.overdueResidentCount ?? '—' }} resident(s)
-                </span>
-              </div>
-              <div class="summary-row">
-                <span class="summary-label">Collection rate</span>
-                <span class="summary-value"
-                      [class.summary-value--success]="(dormStats.collectionRate ?? 0) >= 80"
-                      [class.summary-value--warning]="(dormStats.collectionRate ?? 0) < 80">
-                  {{ dormStats.collectionRate ?? '—' }}%
-                </span>
-              </div>
+              @if (!summaryLoaded) {
+                <div class="empty-state" style="padding:2rem 1rem;font-size:0.85rem">
+                  Select a month and click "Find Summary".
+                </div>
+              } @else {
+                <div class="summary-row">
+                  <span class="summary-label">Verified</span>
+                  <span class="summary-value summary-value--success">
+                    €{{ paymentSummary.totalVerified | number:'1.2-2' }}
+                    <span class="summary-count">({{ paymentSummary.verifiedCount }})</span>
+                  </span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label">Pending Verification</span>
+                  <span class="summary-value summary-value--warning">
+                    €{{ paymentSummary.totalPending | number:'1.2-2' }}
+                    <span class="summary-count">({{ paymentSummary.pendingCount }})</span>
+                  </span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label">Rejected</span>
+                  <span class="summary-value summary-value--danger">
+                    €{{ paymentSummary.totalRejected | number:'1.2-2' }}
+                    <span class="summary-count">({{ paymentSummary.rejectedCount }})</span>
+                  </span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label">Total Submissions</span>
+                  <span class="summary-value">
+                    {{ paymentSummary.verifiedCount + paymentSummary.pendingCount + paymentSummary.rejectedCount }}
+                  </span>
+                </div>
+              }
             </div>
           </div>
 
@@ -710,20 +755,20 @@
                 <img src="icons/chart-bar.svg" class="icon icon--title" alt="report"> Generate Report
               </h3>
               <p class="form-card__desc">
-                Creates a full dormitory report including occupancy, payment status, and complaint summaries.
-                The report is saved to the server and can be downloaded later.
+                Creates a full dormitory PDF with Occupancy, Finances, and Maintenance sections including charts.
+                The report is saved and downloaded automatically.
               </p>
               <div class="report-types">
                 <div class="report-type report-type--active">
                   <img src="icons/trending-up.svg" class="icon icon--lg" alt="full report">
                   <div>
                     <strong>Full Report</strong>
-                    <p>Occupancy + payments + complaints</p>
+                    <p>Occupancy · Finances · Maintenance</p>
                   </div>
                 </div>
               </div>
               <button class="btn-primary btn-full" style="margin-top:1.1rem"
-                      (click)="generateReport()" [disabled]="reportLoading">
+                      (click)="generateAdminReport()" [disabled]="reportLoading">
                 @if (reportLoading) { <span class="spinner"></span> Generating… }
                 @else {
                   <img src="icons/chart-bar.svg" class="icon icon--btn" alt="generate"> Generate Report
@@ -735,6 +780,10 @@
                   {{ reportMsg }}
                 </div>
               }
+              <!-- Hidden canvases for Chart.js rendering -->
+              <canvas #occupancyCanvas  width="400" height="240" style="display:none"></canvas>
+              <canvas #financesCanvas   width="400" height="240" style="display:none"></canvas>
+              <canvas #maintenanceCanvas width="400" height="240" style="display:none"></canvas>
             </div>
 
             <!-- Info card -->
@@ -900,21 +949,21 @@
               </h3>
               <div class="toggle-row">
                 <div>
-                  <strong class="toggle-label">Email Notifications</strong>
-                  <p class="toggle-desc">Send email alerts for important events</p>
+                  <strong class="toggle-label">Enable Notifications</strong>
+                  <p class="toggle-desc">Send alerts for important events</p>
                 </div>
                 <label class="toggle">
-                  <input type="checkbox" [(ngModel)]="notifSettings.notifications" />
+                  <input type="checkbox" [(ngModel)]="notifSettings.notifications_enabled" />
                   <span class="toggle__slider"></span>
                 </label>
               </div>
               <div class="toggle-row">
                 <div>
                   <strong class="toggle-label">Payment Reminders</strong>
-                  <p class="toggle-desc">Auto-remind residents before rent is due</p>
+                  <p class="toggle-desc">Show rent due banner for students and alert admins of unverified payments</p>
                 </div>
                 <label class="toggle">
-                  <input type="checkbox" [(ngModel)]="notifSettings.autoReminders" />
+                  <input type="checkbox" [(ngModel)]="notifSettings.payment_reminders_enabled" />
                   <span class="toggle__slider"></span>
                 </label>
               </div>
@@ -924,7 +973,7 @@
                   <p class="toggle-desc">Notify admin of new maintenance complaints</p>
                 </div>
                 <label class="toggle">
-                  <input type="checkbox" [(ngModel)]="notifSettings.maintenanceAlerts" />
+                  <input type="checkbox" [(ngModel)]="notifSettings.maintenance_alerts_enabled" />
                   <span class="toggle__slider"></span>
                 </label>
               </div>
@@ -940,6 +989,26 @@
       }
 
     </div><!-- /content -->
+
+    <!-- ─── MAINTENANCE → VACANT DIALOG ─────────────────────────────── -->
+    @if (maintenanceDialog.open) {
+      <div class="conf-backdrop" (click)="closeMaintenanceDialog()">
+        <div class="conf-dialog" (click)="$event.stopPropagation()">
+          <h3 class="conf-dialog__title">Clear Maintenance Status</h3>
+          <p class="conf-dialog__msg">
+            Mark room <strong>{{ maintenanceDialog.room?.room_number }}</strong> as
+            <strong>Vacant</strong>? This confirms repairs are complete and the room is available for allocation.
+          </p>
+          <div class="conf-dialog__actions">
+            <button class="btn-secondary" (click)="closeMaintenanceDialog()">Cancel</button>
+            <button class="btn-primary" (click)="confirmClearMaintenance()"
+                    [disabled]="maintenanceDialog.loading">
+              @if (maintenanceDialog.loading) { <span class="spinner"></span> } @else { Confirm }
+            </button>
+          </div>
+        </div>
+      </div>
+    }
 
     <!-- ─── ACCEPT APPLICATION DIALOG ──────────────────────────────── -->
     @if (acceptDialog.open) {
@@ -1144,6 +1213,20 @@
         </div>
       </div>
     }
+
+    <!-- Toast notifications -->
+    <div class="toast-container">
+      @for (t of toasts; track t.notification_id) {
+        <div class="toast toast--{{ t.type }}" (click)="onToastClick(t)">
+          <span class="toast__icon">{{ notifIcon(t.type) }}</span>
+          <span class="toast__msg">{{ t.message }}</span>
+          <button class="toast__close" (click)="$event.stopPropagation(); dismissToast(t)">✕</button>
+        </div>
+      }
+    </div>
+
+    <!-- Child route outlet (hidden — parent shell owns all rendering) -->
+    <router-outlet style="display:none" />
 
   </div><!-- /main -->
 </div><!-- /layout -->

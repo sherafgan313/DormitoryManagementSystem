@@ -86,13 +86,31 @@ async function runMigrations() {
        FOREIGN KEY (contract_id) REFERENCES contracts(contract_id)
      )`,
     `ALTER TABLE dorm_applications ADD COLUMN remarks TEXT DEFAULT NULL`,
+    `CREATE TABLE IF NOT EXISTS notifications (
+       notification_id INT AUTO_INCREMENT PRIMARY KEY,
+       user_id INT NOT NULL,
+       type ENUM('application','contract','payment','complaint') NOT NULL,
+       message TEXT NOT NULL,
+       tab VARCHAR(30) NOT NULL,
+       is_read TINYINT(1) DEFAULT 0,
+       reference_id VARCHAR(100) DEFAULT NULL,
+       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+       FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+     )`,
+    `ALTER TABLE notifications ADD COLUMN reference_id VARCHAR(100) DEFAULT NULL`,
+    `ALTER TABLE notifications ADD UNIQUE KEY uniq_user_ref (user_id, reference_id)`,
+    `ALTER TABLE dormitories ADD COLUMN notifications_enabled TINYINT(1) NOT NULL DEFAULT 1`,
+    `ALTER TABLE dormitories ADD COLUMN payment_reminders_enabled TINYINT(1) NOT NULL DEFAULT 1`,
+    `ALTER TABLE dormitories ADD COLUMN maintenance_alerts_enabled TINYINT(1) NOT NULL DEFAULT 1`,
+    `ALTER TABLE reports ADD COLUMN report_source ENUM('ADMIN','STUDENT') NOT NULL DEFAULT 'STUDENT'`,
   ];
   for (const sql of migrations) {
     try {
       await dbp.query(sql);
     } catch (err) {
-      if (err.code !== 'ER_DUP_FIELDNAME') console.error('Migration error:', err.message);
-      // ER_DUP_FIELDNAME = column already exists → safe to ignore
+      // ER_DUP_FIELDNAME = column already exists, ER_DUP_KEYNAME = index already exists → safe to ignore
+      if (err.code !== 'ER_DUP_FIELDNAME' && err.code !== 'ER_DUP_KEYNAME')
+        console.error('Migration error:', err.message);
     }
   }
   console.log("Migrations checked.");
@@ -239,24 +257,172 @@ function requireRole(...roles) {
 }
 
 
+// ─── NOTIFICATIONS INFRASTRUCTURE ────────────────────────────────────────────
+
+// userId (number) → Set of active SSE response objects
+const sseClients = new Map();
+
+// referenceId: optional dedup key — uses INSERT IGNORE so duplicate refs are silently skipped
+async function pushNotification(userId, type, message, tab, referenceId = null) {
+  const dbp = db.promise();
+  try {
+    const sql = referenceId
+      ? "INSERT IGNORE INTO notifications (user_id, type, message, tab, reference_id) VALUES (?,?,?,?,?)"
+      : "INSERT INTO notifications (user_id, type, message, tab) VALUES (?,?,?,?)";
+    const params = referenceId
+      ? [userId, type, message, tab, referenceId]
+      : [userId, type, message, tab];
+    const [result] = await dbp.query(sql, params);
+    if (!result.insertId) return; // INSERT IGNORE skipped (duplicate reference_id)
+    const notif = {
+      notification_id: result.insertId,
+      user_id: userId, type, message, tab,
+      is_read: 0,
+      created_at: new Date().toISOString(),
+    };
+    const clients = sseClients.get(Number(userId));
+    if (clients && clients.size > 0) {
+      const payload = `data: ${JSON.stringify({ type: "notification", notification: notif })}\n\n`;
+      for (const res of clients) { try { res.write(payload); } catch {} }
+    }
+  } catch (err) { console.error("pushNotification error:", err.message); }
+}
+
+// Helper: get all admin user_ids (for dormitory-wide alerts)
+async function getAllAdminUserIds() {
+  const dbp = db.promise();
+  const [rows] = await dbp.query("SELECT user_id FROM admin_profiles").catch(() => [[]]);
+  return rows.map(r => r.user_id);
+}
+
+// Helper: push a notification to a student only if notifications_enabled for their dormitory
+async function pushStudentNotification(userId, dormitoryId, type, message, tab) {
+  const dbp = db.promise();
+  try {
+    const [[dorm]] = await dbp.query(
+      "SELECT notifications_enabled FROM dormitories WHERE dormitory_id = ?", [dormitoryId]);
+    if (!dorm?.notifications_enabled) return;
+    await pushNotification(userId, type, message, tab);
+  } catch (err) { console.error("pushStudentNotification error:", err.message); }
+}
+
+// Delete notifications for users whose contract has expired — runs daily
+async function cleanupExpiredNotifications() {
+  const dbp = db.promise();
+  await dbp.query(
+    `DELETE n FROM notifications n
+     WHERE EXISTS (
+       SELECT 1 FROM contracts c
+       WHERE c.user_id = n.user_id AND c.end_date < CURDATE()
+     )`
+  ).catch(err => console.error("Notification cleanup error:", err.message));
+}
+cleanupExpiredNotifications();
+setInterval(cleanupExpiredNotifications, 24 * 60 * 60 * 1000);
+
+// Trigger 4: notify admins when a payment has been pending verification for 5+ days
+async function checkUnverifiedPayments() {
+  const dbp = db.promise();
+  try {
+    const [payments] = await dbp.query(`
+      SELECT rp.payment_id, rp.user_id, rp.month, rp.amount, u.name AS student_name
+      FROM rent_payments rp
+      JOIN users u ON u.user_id = rp.user_id
+      WHERE rp.verification_status = 'PENDING_VERIFICATION'
+        AND DATEDIFF(NOW(), rp.created_at) >= 5
+    `);
+    // Only notify admins whose dormitory has payment reminders enabled
+    const [adminRows] = await dbp.query(`
+      SELECT ap.user_id FROM admin_profiles ap
+      JOIN dormitories d ON d.dormitory_id = ap.dormitory_id
+      WHERE d.payment_reminders_enabled = 1
+    `);
+    const adminIds = adminRows.map(r => r.user_id);
+    for (const p of payments) {
+      for (const adminId of adminIds) {
+        const refId = `unverified_payment_${p.payment_id}_admin_${adminId}`;
+        await pushNotification(adminId, "payment",
+          `${p.student_name}'s payment of €${p.amount} for ${p.month} has been pending verification for 5+ days.`,
+          "payments", refId);
+      }
+    }
+  } catch (err) { console.error("checkUnverifiedPayments error:", err.message); }
+}
+
+// Trigger 5: notify admins when a student hasn't paid rent after the monthly due date
+async function checkUnpaidRent() {
+  const dbp = db.promise();
+  const now = new Date();
+  const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const currentMonth = monthNames[now.getMonth()];
+  const currentYear  = now.getFullYear();
+  const monthKey     = `${currentYear}_${String(now.getMonth() + 1).padStart(2, "0")}`;
+  try {
+    const [students] = await dbp.query(`
+      SELECT c.user_id, c.due_day, u.name AS student_name
+      FROM contracts c
+      JOIN users u ON u.user_id = c.user_id
+      WHERE c.status = 'ACTIVE'
+        AND DAY(CURDATE()) > c.due_day
+        AND NOT EXISTS (
+          SELECT 1 FROM rent_payments rp
+          WHERE rp.user_id = c.user_id
+            AND rp.month = ?
+            AND YEAR(rp.created_at) = ?
+        )
+    `, [currentMonth, currentYear]);
+    // Only notify admins whose dormitory has payment reminders enabled
+    const [adminRows] = await dbp.query(`
+      SELECT ap.user_id FROM admin_profiles ap
+      JOIN dormitories d ON d.dormitory_id = ap.dormitory_id
+      WHERE d.payment_reminders_enabled = 1
+    `);
+    const adminIds = adminRows.map(r => r.user_id);
+    for (const s of students) {
+      for (const adminId of adminIds) {
+        const refId = `unpaid_rent_${s.user_id}_${monthKey}_admin_${adminId}`;
+        await pushNotification(adminId, "payment",
+          `${s.student_name} has not paid rent for ${currentMonth}. Due date (day ${s.due_day}) has passed.`,
+          "payments", refId);
+      }
+    }
+  } catch (err) { console.error("checkUnpaidRent error:", err.message); }
+}
+
+// Run scheduled checks after a short delay (let DB settle first), then every 12h / 24h
+setTimeout(() => {
+  checkUnverifiedPayments();
+  checkUnpaidRent();
+}, 60 * 1000); // 1 min after boot
+setInterval(checkUnverifiedPayments, 12 * 60 * 60 * 1000);
+setInterval(checkUnpaidRent,         24 * 60 * 60 * 1000);
+
 // ─── AUTH ────────────────────────────────────────────────────────────────────
 
 app.post("/api/register", async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, phone, student_id_number, course, university } = req.body;
   if (!name || !email || !password)
     return res.status(400).json({ message: "name, email and password are required" });
+  const dbp = db.promise();
   try {
     const hash = await bcrypt.hash(password, 10);
-    db.query(
+    await dbp.query("START TRANSACTION");
+    const [result] = await dbp.query(
       "INSERT INTO users (name, email, password_hash, role) VALUES (?,?,?,'STUDENT')",
-      [name, email, hash],
-      (err) => {
-        if (err?.code === "ER_DUP_ENTRY") return res.status(409).json({ message: "Email already registered" });
-        if (err) return res.status(500).json({ message: "Registration failed" });
-        res.json({ message: "Student account created" });
-      }
+      [name, email, hash]
     );
-  } catch { res.status(500).json({ message: "Server error" }); }
+    const userId = result.insertId;
+    await dbp.query(
+      "INSERT INTO student_profiles (user_id, phone, student_id_number, course, university) VALUES (?,?,?,?,?)",
+      [userId, phone ?? null, student_id_number ?? null, course ?? null, university ?? null]
+    );
+    await dbp.query("COMMIT");
+    res.json({ message: "Student account created" });
+  } catch (err) {
+    await dbp.query("ROLLBACK").catch(() => {});
+    if (err?.code === "ER_DUP_ENTRY") return res.status(409).json({ message: "Email already registered" });
+    res.status(500).json({ message: "Registration failed" });
+  }
 });
 
 app.post("/api/login", (req, res) => {
@@ -274,6 +440,68 @@ app.post("/api/login", (req, res) => {
 });
 
 
+// ─── NOTIFICATION ENDPOINTS ──────────────────────────────────────────────────
+
+// SSE stream — token via ?token= because EventSource can't set custom headers
+app.get("/api/notifications/stream", (req, res) => {
+  let decoded;
+  try { decoded = jwt.verify(req.query.token, SECRET); }
+  catch { return res.status(401).end(); }
+  const userId = Number(decoded.id);
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+  res.write(": connected\n\n");
+
+  if (!sseClients.has(userId)) sseClients.set(userId, new Set());
+  sseClients.get(userId).add(res);
+
+  const heartbeat = setInterval(() => { try { res.write(": ping\n\n"); } catch {} }, 25000);
+
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    const clients = sseClients.get(userId);
+    if (clients) { clients.delete(res); if (clients.size === 0) sseClients.delete(userId); }
+  });
+});
+
+app.get("/api/notifications", authMiddleware, (req, res) => {
+  db.query(
+    "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50",
+    [req.user.id],
+    (err, rows) => {
+      if (err) return res.status(500).json({ message: "Failed to load notifications" });
+      res.json(rows);
+    }
+  );
+});
+
+// NOTE: read-all MUST be registered before :id/read to avoid route conflict
+app.patch("/api/notifications/read-all", authMiddleware, (req, res) => {
+  db.query(
+    "UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0",
+    [req.user.id],
+    (err) => {
+      if (err) return res.status(500).json({ message: "Failed" });
+      res.json({ message: "All marked as read" });
+    }
+  );
+});
+
+app.patch("/api/notifications/:id/read", authMiddleware, (req, res) => {
+  db.query(
+    "UPDATE notifications SET is_read = 1 WHERE notification_id = ? AND user_id = ?",
+    [req.params.id, req.user.id],
+    (err) => {
+      if (err) return res.status(500).json({ message: "Failed" });
+      res.json({ message: "Marked as read" });
+    }
+  );
+});
+
 // ─── APPLICATIONS ────────────────────────────────────────────────────────────
 
 app.post("/api/applications", authMiddleware, (req, res) => {
@@ -287,6 +515,17 @@ app.post("/api/applications", authMiddleware, (req, res) => {
     (err, result) => {
       if (err) return res.status(500).json({ message: "Failed to submit application" });
       res.json({ message: "Application submitted", applicationId: result.insertId });
+      const label = application_type === "EXTENSION" ? "extension" : "room";
+      pushStudentNotification(req.user.id, req.user.dormitory_id, "application",
+        `Your ${label} application has been submitted and is pending review.`, "apply");
+      // Notify all admins
+      getAllAdminUserIds().then(adminIds => {
+        const appType = application_type === "EXTENSION" ? "Extension" : "New";
+        adminIds.forEach(adminId =>
+          pushNotification(adminId, "application",
+            `${appType} application received from a student.`, "residents")
+        );
+      });
     }
   );
 });
@@ -372,6 +611,8 @@ app.patch("/api/applications/:id/status", authMiddleware, requireRole("ADMIN"), 
       const realContractId = ctr.contract_id;
 
       await dbp.query("COMMIT");
+      pushStudentNotification(userId, req.user.dormitory_id, "application",
+        `Your application has been accepted! Room ${room.room_number} has been assigned to you.`, "apply");
 
       // Generate PDF after commit (non-blocking to response)
       try {
@@ -400,6 +641,10 @@ app.patch("/api/applications/:id/status", authMiddleware, requireRole("ADMIN"), 
     } else {
       await dbp.query("UPDATE dorm_applications SET status = ?, remarks = ? WHERE application_id = ?", [status, remarks || null, appId]);
       await dbp.query("COMMIT");
+      if (status === "REJECTED") {
+        pushStudentNotification(userId, req.user.dormitory_id, "application",
+          "Your application has been rejected. Please check the Apply section for details.", "apply");
+      }
     }
 
     res.json({ message: "Application status updated" });
@@ -619,6 +864,19 @@ app.post("/api/complaints", authMiddleware, (req, res) => {
   db.query("INSERT INTO complaints (user_id, description) VALUES (?,?)", [req.user.id, description], (err) => {
     if (err) return res.status(500).json({ message: "Failed to submit complaint" });
     res.json({ message: "Complaint submitted" });
+    // Notify all admins if maintenance alerts are enabled
+    const dormId = req.user.dormitory_id;
+    db.promise().query(
+      "SELECT maintenance_alerts_enabled FROM dormitories WHERE dormitory_id = ?", [dormId]
+    ).then(([[dorm]]) => {
+      if (!dorm?.maintenance_alerts_enabled) return;
+      getAllAdminUserIds().then(adminIds =>
+        adminIds.forEach(adminId =>
+          pushNotification(adminId, "complaint",
+            "A new complaint has been submitted by a student.", "requests")
+        )
+      );
+    }).catch(() => {});
   });
 });
 
@@ -644,15 +902,27 @@ app.get("/api/complaints", authMiddleware, (req, res) => {
   }
 });
 
-app.patch("/api/complaints/:id/status", authMiddleware, requireRole("ADMIN"), (req, res) => {
+app.patch("/api/complaints/:id/status", authMiddleware, requireRole("ADMIN"), async (req, res) => {
   const { status } = req.body;
   const allowed = ["SUBMITTED","IN_PROGRESS","RESOLVED"];
   if (!allowed.includes(status)) return res.status(400).json({ message: `status must be one of: ${allowed.join(", ")}` });
-  db.query("UPDATE complaints SET status = ? WHERE complaint_id = ?", [status, req.params.id], (err, result) => {
-    if (err)                  return res.status(500).json({ message: "Update failed" });
+  const dbp = db.promise();
+  try {
+    const [[complaint]] = await dbp.query(
+      "SELECT user_id, complaint_id FROM complaints WHERE complaint_id = ?", [req.params.id]);
+    if (!complaint) return res.status(404).json({ message: "Complaint not found" });
+    const [result] = await dbp.query(
+      "UPDATE complaints SET status = ? WHERE complaint_id = ?", [status, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ message: "Complaint not found" });
     res.json({ message: "Complaint status updated" });
-  });
+    if (status === "IN_PROGRESS") {
+      pushStudentNotification(complaint.user_id, req.user.dormitory_id, "complaint",
+        `Your complaint #${complaint.complaint_id} is now being investigated.`, "complaints");
+    } else if (status === "RESOLVED") {
+      pushStudentNotification(complaint.user_id, req.user.dormitory_id, "complaint",
+        `Your complaint #${complaint.complaint_id} has been resolved.`, "complaints");
+    }
+  } catch { res.status(500).json({ message: "Update failed" }); }
 });
 
 
@@ -710,29 +980,35 @@ app.get("/api/payments", authMiddleware, (req, res) => {
 });
 
 // Admin verifies a payment
-app.patch("/api/payments/:id/verify", authMiddleware, requireRole("ADMIN"), (req, res) => {
-  db.query(
-    "UPDATE rent_payments SET verification_status = 'VERIFIED' WHERE payment_id = ?",
-    [req.params.id],
-    (err, result) => {
-      if (err)                  return res.status(500).json({ message: "Update failed" });
-      if (!result.affectedRows) return res.status(404).json({ message: "Payment not found" });
-      res.json({ message: "Payment verified" });
-    }
-  );
+app.patch("/api/payments/:id/verify", authMiddleware, requireRole("ADMIN"), async (req, res) => {
+  const dbp = db.promise();
+  try {
+    const [[payment]] = await dbp.query(
+      "SELECT user_id, month FROM rent_payments WHERE payment_id = ?", [req.params.id]);
+    if (!payment) return res.status(404).json({ message: "Payment not found" });
+    const [result] = await dbp.query(
+      "UPDATE rent_payments SET verification_status = 'VERIFIED' WHERE payment_id = ?", [req.params.id]);
+    if (!result.affectedRows) return res.status(404).json({ message: "Payment not found" });
+    res.json({ message: "Payment verified" });
+    pushStudentNotification(payment.user_id, req.user.dormitory_id, "payment",
+      `Your payment for ${payment.month} has been verified successfully.`, "payments");
+  } catch { res.status(500).json({ message: "Update failed" }); }
 });
 
 // Admin rejects a payment
-app.patch("/api/payments/:id/reject", authMiddleware, requireRole("ADMIN"), (req, res) => {
-  db.query(
-    "UPDATE rent_payments SET verification_status = 'REJECTED' WHERE payment_id = ?",
-    [req.params.id],
-    (err, result) => {
-      if (err)                  return res.status(500).json({ message: "Update failed" });
-      if (!result.affectedRows) return res.status(404).json({ message: "Payment not found" });
-      res.json({ message: "Payment rejected" });
-    }
-  );
+app.patch("/api/payments/:id/reject", authMiddleware, requireRole("ADMIN"), async (req, res) => {
+  const dbp = db.promise();
+  try {
+    const [[payment]] = await dbp.query(
+      "SELECT user_id, month FROM rent_payments WHERE payment_id = ?", [req.params.id]);
+    if (!payment) return res.status(404).json({ message: "Payment not found" });
+    const [result] = await dbp.query(
+      "UPDATE rent_payments SET verification_status = 'REJECTED' WHERE payment_id = ?", [req.params.id]);
+    if (!result.affectedRows) return res.status(404).json({ message: "Payment not found" });
+    res.json({ message: "Payment rejected" });
+    pushStudentNotification(payment.user_id, req.user.dormitory_id, "payment",
+      `Your payment for ${payment.month} was rejected. Please resubmit with a valid receipt.`, "payments");
+  } catch { res.status(500).json({ message: "Update failed" }); }
 });
 
 // Admin downloads a payment receipt
@@ -750,6 +1026,50 @@ app.get("/api/payments/:id/receipt", authMiddleware, requireRole("ADMIN"), async
     if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found on disk" });
     res.download(filePath, rows[0].file_path);
   } catch { res.status(500).json({ message: "Download failed" }); }
+});
+
+
+// Payment summary for a specific month (admin only)
+app.get("/api/payments/summary", authMiddleware, requireRole("ADMIN"), async (req, res) => {
+  const { month, year } = req.query;
+  if (!month || !year) return res.status(400).json({ message: "month and year are required" });
+  const dbp = db.promise();
+  try {
+    const [payments] = await dbp.query(
+      `SELECT rp.payment_id, rp.user_id, rp.month, rp.amount, rp.verification_status,
+              rp.created_at, u.name AS user_name
+       FROM rent_payments rp
+       JOIN users u ON u.user_id = rp.user_id
+       WHERE rp.month = ? AND YEAR(rp.created_at) = ?
+       ORDER BY rp.created_at DESC`,
+      [month, year]
+    );
+    const verified  = payments.filter(p => p.verification_status === 'VERIFIED');
+    const pending   = payments.filter(p => p.verification_status === 'PENDING_VERIFICATION');
+    const rejected  = payments.filter(p => p.verification_status === 'REJECTED');
+    res.json({
+      month, year: Number(year),
+      totalVerified:  verified.reduce((s, p) => s + Number(p.amount), 0),
+      totalPending:   pending.reduce((s, p) => s + Number(p.amount), 0),
+      totalRejected:  rejected.reduce((s, p) => s + Number(p.amount), 0),
+      verifiedCount:  verified.length,
+      pendingCount:   pending.length,
+      rejectedCount:  rejected.length,
+      payments,
+    });
+  } catch (err) { res.status(500).json({ message: "Failed to load summary" }); }
+});
+
+// Admin room status change (maintenance → vacant)
+app.patch("/api/rooms/:id/status", authMiddleware, requireRole("ADMIN"), async (req, res) => {
+  const dbp = db.promise();
+  try {
+    const [[room]] = await dbp.query("SELECT status FROM rooms WHERE room_id = ?", [req.params.id]);
+    if (!room) return res.status(404).json({ message: "Room not found" });
+    if (room.status !== 'maintenance') return res.status(400).json({ message: "Only maintenance rooms can be cleared" });
+    await dbp.query("UPDATE rooms SET status = 'vacant' WHERE room_id = ?", [req.params.id]);
+    res.json({ message: "Room marked as vacant" });
+  } catch { res.status(500).json({ message: "Failed to update room status" }); }
 });
 
 
@@ -829,16 +1149,132 @@ app.delete("/api/reports/:id", authMiddleware, requireRole("STUDENT"), async (re
   } catch { res.status(500).json({ message: "Cancel failed" }); }
 });
 
-// Admin: list all reports
+// Admin: list admin-generated reports only
 app.get("/api/reports", authMiddleware, requireRole("ADMIN"), (req, res) => {
   db.query(
     `SELECT r.*, u.name AS generated_by_name FROM reports r
-     LEFT JOIN users u ON r.generated_by = u.user_id ORDER BY r.generation_date DESC`,
+     LEFT JOIN users u ON r.generated_by = u.user_id
+     WHERE r.report_source = 'ADMIN'
+     ORDER BY r.generation_date DESC`,
     (err, rows) => {
       if (err) return res.status(500).json({ message: "Failed to load reports" });
       res.json(rows);
     }
   );
+});
+
+// Admin: generate dormitory PDF report (with embedded chart images from frontend)
+app.post("/api/admin/reports", authMiddleware, requireRole("ADMIN"), async (req, res) => {
+  const { stats, chartImages } = req.body;
+  const dbp = db.promise();
+  try {
+    const [[dorm]] = await dbp.query(
+      "SELECT name, address FROM dormitories WHERE dormitory_id = ?", [req.user.dormitory_id]);
+    const dormName = dorm?.name ?? 'Dormitory';
+    const dormAddr = dorm?.address ?? '';
+
+    const fileName = `admin_report_${req.user.id}_${Date.now()}.pdf`;
+    const filePath = path.join(reportsDir, fileName);
+
+    await new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const stream = fs.createWriteStream(filePath);
+      doc.pipe(stream);
+      stream.on('finish', resolve);
+      stream.on('error', reject);
+
+      const blue = '#1a3a5c', accent = '#3b82f6';
+      const pageW = doc.page.width;
+      const contentW = pageW - 100;
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      // ── Cover header ──
+      doc.rect(0, 0, pageW, 90).fill(blue);
+      doc.fillColor('#fff').fontSize(20).font('Helvetica-Bold')
+         .text(dormName, 50, 22, { align: 'center', width: contentW });
+      doc.fontSize(10).font('Helvetica').fillColor('#aaccee')
+         .text(dormAddr, 50, 48, { align: 'center', width: contentW });
+      doc.fillColor('#fff').fontSize(8)
+         .text(`Full Dormitory Report · ${dateStr}`, 50, 66, { align: 'center', width: contentW });
+
+      let y = 108;
+
+      // Helper: section title
+      const sectionTitle = (title, icon) => {
+        doc.rect(50, y, contentW, 24).fill(accent);
+        doc.fillColor('#fff').fontSize(11).font('Helvetica-Bold')
+           .text(title, 60, y + 6, { width: contentW - 20 });
+        y += 32;
+        doc.fillColor('#000').font('Helvetica').fontSize(9);
+      };
+
+      // Helper: stat row
+      const statRow = (label, value) => {
+        doc.font('Helvetica-Bold').fillColor('#333').text(label + ':', 60, y, { continued: true, width: 200 });
+        doc.font('Helvetica').fillColor('#000').text('  ' + value);
+        y += 16;
+      };
+
+      // Helper: embed chart image (base64 PNG from Chart.js canvas)
+      const embedChart = (b64, label) => {
+        if (!b64) return;
+        try {
+          const buf = Buffer.from(b64.replace(/^data:image\/png;base64,/, ''), 'base64');
+          const imgW = 220, imgH = 130;
+          const x = (pageW - imgW) / 2;
+          if (y + imgH + 20 > doc.page.height - 50) { doc.addPage(); y = 50; }
+          doc.image(buf, x, y, { width: imgW, height: imgH });
+          y += imgH + 8;
+          doc.fontSize(7).fillColor('#666').font('Helvetica')
+             .text(label, 0, y, { align: 'center', width: pageW });
+          y += 16;
+        } catch {}
+      };
+
+      // ── 1. Occupancy ──
+      sectionTitle('1. Occupancy');
+      statRow('Total Rooms', stats?.totalRooms ?? '—');
+      statRow('Occupied', stats?.occupiedRooms ?? '—');
+      statRow('Vacant', stats?.vacantRooms ?? '—');
+      statRow('Under Maintenance', stats?.maintenanceRooms ?? '—');
+      statRow('Occupancy Rate', stats?.totalRooms ? Math.round((stats.occupiedRooms / stats.totalRooms) * 100) + '%' : '—');
+      y += 6;
+      embedChart(chartImages?.occupancy, 'Figure 1 — Room Status Distribution');
+
+      // ── 2. Finances ──
+      if (y + 80 > doc.page.height - 50) { doc.addPage(); y = 50; }
+      sectionTitle('2. Finances');
+      statRow('Active Contracts', stats?.activeContracts ?? '—');
+      statRow('Total Payments Recorded', stats?.totalPayments ?? '—');
+      statRow('Pending Applications', stats?.pendingApplications ?? '—');
+      y += 6;
+      embedChart(chartImages?.finances, 'Figure 2 — Payment Verification Status');
+
+      // ── 3. Maintenance ──
+      if (y + 80 > doc.page.height - 50) { doc.addPage(); y = 50; }
+      sectionTitle('3. Maintenance & Complaints');
+      statRow('Total Students', stats?.totalStudents ?? '—');
+      statRow('Open Complaints', stats?.openComplaints ?? '—');
+      y += 6;
+      embedChart(chartImages?.maintenance, 'Figure 3 — Complaint Status Breakdown');
+
+      // ── Footer ──
+      doc.fontSize(7).fillColor('#999').font('Helvetica')
+         .text(`Generated by DormMS · ${dateStr}`, 50, doc.page.height - 35, { align: 'center', width: contentW });
+
+      doc.end();
+    });
+
+    const [repRow] = await dbp.query(
+      "INSERT INTO reports (generated_by, status, file_path, report_source) VALUES (?,?,?,?)",
+      [req.user.id, 'COMPLETED', fileName, 'ADMIN']
+    );
+    res.json({ message: "Report generated", reportId: repRow.insertId, fileName });
+  } catch (err) {
+    console.error("Admin report error:", err.message);
+    res.status(500).json({ message: "Failed to generate report" });
+  }
 });
 
 
@@ -1105,11 +1541,34 @@ app.put("/api/admin/profile", authMiddleware, requireRole("ADMIN"), async (req, 
   try {
     await dbp.query("UPDATE users SET name = ?, email = ? WHERE user_id = ?", [name, email, req.user.id]);
     await dbp.query("UPDATE admin_profiles SET position = ?, phone = ? WHERE user_id = ?", [position ?? "Dormitory Administrator", phone ?? null, req.user.id]);
+    const newCapacity = max_capacity ?? 50;
     await dbp.query(
       `UPDATE dormitories SET name = ?, address = ?, contact_email = ?, contact_phone = ?, max_capacity = ?
        WHERE dormitory_id = (SELECT dormitory_id FROM admin_profiles WHERE user_id = ?)`,
-      [dormitory_name, address ?? null, contact_email ?? null, contact_phone ?? null, max_capacity ?? 50, req.user.id]
+      [dormitory_name, address ?? null, contact_email ?? null, contact_phone ?? null, newCapacity, req.user.id]
     );
+
+    // Sync room count to max_capacity
+    const [[{ currentCount }]] = await dbp.query("SELECT COUNT(*) AS currentCount FROM rooms");
+    if (newCapacity > currentCount) {
+      const toCreate = newCapacity - currentCount;
+      for (let i = 1; i <= toCreate; i++) {
+        const num = currentCount + i;
+        const floor = Math.ceil(num / 10);
+        const roomNum = `${floor}${String(num % 10 === 0 ? 10 : num % 10).padStart(2, '0')}`;
+        await dbp.query(
+          "INSERT INTO rooms (room_number, floor, type, status) VALUES (?,?,?,?)",
+          [roomNum, floor, 'Single', 'vacant']
+        );
+      }
+    } else if (newCapacity < currentCount) {
+      const toRemove = currentCount - newCapacity;
+      await dbp.query(
+        "DELETE FROM rooms WHERE status = 'vacant' ORDER BY room_id DESC LIMIT ?",
+        [toRemove]
+      );
+    }
+
     res.json({ message: "Admin profile updated" });
   } catch (err) {
     if (err.code === "ER_DUP_ENTRY") return res.status(409).json({ message: "Email already in use" });
@@ -1135,6 +1594,32 @@ app.get("/api/activity", authMiddleware, requireRole("ADMIN"), (req, res) => {
     if (err) return res.status(500).json({ message: "Failed to load activity" });
     res.json(rows);
   });
+});
+
+
+// ─── DORMITORY SETTINGS ──────────────────────────────────────────────────────
+
+app.get("/api/dormitory-settings", authMiddleware, async (req, res) => {
+  const dbp = db.promise();
+  try {
+    const [[settings]] = await dbp.query(
+      "SELECT notifications_enabled, payment_reminders_enabled, maintenance_alerts_enabled FROM dormitories WHERE dormitory_id = ?",
+      [req.user.dormitory_id]
+    );
+    res.json(settings ?? { notifications_enabled: 1, payment_reminders_enabled: 1, maintenance_alerts_enabled: 1 });
+  } catch (err) { res.status(500).json({ message: "Failed to load settings" }); }
+});
+
+app.put("/api/dormitory-settings", authMiddleware, requireRole("ADMIN"), async (req, res) => {
+  const { notifications_enabled, payment_reminders_enabled, maintenance_alerts_enabled } = req.body;
+  const dbp = db.promise();
+  try {
+    await dbp.query(
+      "UPDATE dormitories SET notifications_enabled = ?, payment_reminders_enabled = ?, maintenance_alerts_enabled = ? WHERE dormitory_id = ?",
+      [notifications_enabled ? 1 : 0, payment_reminders_enabled ? 1 : 0, maintenance_alerts_enabled ? 1 : 0, req.user.dormitory_id]
+    );
+    res.json({ message: "Settings saved" });
+  } catch (err) { res.status(500).json({ message: "Failed to save settings" }); }
 });
 
 
@@ -1263,6 +1748,13 @@ app.post("/api/termination-requests", authMiddleware, requireRole("STUDENT"), as
       "INSERT INTO termination_requests (user_id, contract_id, reason, requested_end_date) VALUES (?,?,?,?)",
       [req.user.id, contract.contract_id, reason, requested_end_date]);
     res.json({ message: "Termination request submitted", requestId: result.insertId });
+    // Notify all admins
+    getAllAdminUserIds().then(adminIds =>
+      adminIds.forEach(adminId =>
+        pushNotification(adminId, "contract",
+          "A student has submitted a termination request.", "residents")
+      )
+    );
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to submit termination request" });
@@ -1316,6 +1808,8 @@ app.patch("/api/termination-requests/:id/accept", authMiddleware, requireRole("A
       "UPDATE rooms SET status = 'vacant', resident_id = NULL WHERE resident_id = ?", [request.user_id]);
     await dbp.query("COMMIT");
     res.json({ message: "Termination request accepted", end_date: endDateStr });
+    pushStudentNotification(request.user_id, req.user.dormitory_id, "contract",
+      `Your contract termination request has been accepted. Your contract will end on ${endDateStr}.`, "contract");
   } catch (err) {
     await dbp.query("ROLLBACK").catch(() => {});
     console.error(err);
@@ -1327,10 +1821,15 @@ app.patch("/api/termination-requests/:id/accept", authMiddleware, requireRole("A
 app.patch("/api/termination-requests/:id/reject", authMiddleware, requireRole("ADMIN"), async (req, res) => {
   const dbp = db.promise();
   try {
+    const [[request]] = await dbp.query(
+      "SELECT user_id FROM termination_requests WHERE request_id = ?", [req.params.id]);
+    if (!request) return res.status(404).json({ message: "Request not found" });
     const [result] = await dbp.query(
       "UPDATE termination_requests SET status = 'REJECTED' WHERE request_id = ?", [req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ message: "Request not found" });
     res.json({ message: "Termination request rejected" });
+    pushStudentNotification(request.user_id, req.user.dormitory_id, "contract",
+      "Your contract termination request has been declined.", "contract");
   } catch { res.status(500).json({ message: "Failed to reject termination request" }); }
 });
 

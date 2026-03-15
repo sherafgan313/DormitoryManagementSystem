@@ -16,6 +16,8 @@
         <button
           class="sidebar__nav-item"
           [class.sidebar__nav-item--active]="activeNav === item.id"
+          [class.sidebar__nav-item--disabled]="isNavDisabled(item.id)"
+          [attr.title]="isNavDisabled(item.id) ? 'Available once you have an active contract' : null"
           (click)="setActive(item.id)"
         >
           <span class="sidebar__nav-icon">
@@ -23,6 +25,9 @@
           </span>
           @if (sidebarOpen) {
             <span class="sidebar__nav-label">{{ item.label }}</span>
+            @if (isNavDisabled(item.id)) {
+              <img src="icons/lock-closed.svg" class="icon icon--xs nav-lock" alt="locked">
+            }
           }
         </button>
       }
@@ -46,9 +51,53 @@
         <span class="topbar__page">{{ pageName }}</span>
       </div>
       <div class="topbar__right">
-        <button class="topbar__icon-btn" title="Notifications">
-          <img src="icons/bell.svg" class="icon" alt="notifications">
-        </button>
+        <!-- Notification bell + panel -->
+        <div class="notif-wrapper" (click)="$event.stopPropagation()">
+          <button class="topbar__icon-btn" title="Notifications" (click)="toggleNotifPanel($event)">
+            <img src="icons/bell.svg" class="icon" alt="notifications">
+            @if (notifService.unreadCount > 0) {
+              <span class="notif-badge">{{ notifService.unreadCount > 9 ? '9+' : notifService.unreadCount }}</span>
+            }
+          </button>
+
+          @if (notifPanelOpen) {
+            <div class="notif-panel">
+              <div class="notif-panel__header">
+                <span class="notif-panel__title">Notifications</span>
+                @if (notifService.unreadCount > 0) {
+                  <button class="notif-panel__mark-all" (click)="markAllRead()">Mark all read</button>
+                }
+              </div>
+              <div class="notif-panel__list">
+                @if (notifications.length === 0) {
+                  <div class="notif-empty">
+                    <img src="icons/check-circle.svg" class="icon" alt="empty">
+                    You're all caught up!
+                  </div>
+                }
+                @for (n of notifications; track n.notification_id) {
+                  <div class="notif-item" [class.notif-item--unread]="!n.is_read"
+                       (click)="onNotifClick(n, $event)">
+                    <span class="notif-item__dot notif-item__dot--{{ n.type }}">
+                      <img [src]="'icons/' + notifIcon(n.type)" class="icon icon--xs" [alt]="n.type">
+                    </span>
+                    <div class="notif-item__body">
+                      <p class="notif-item__msg">{{ n.message }}</p>
+                      <span class="notif-item__time">{{ timeAgo(n.created_at) }}</span>
+                    </div>
+                    @if (!n.is_read) {
+                      <button class="notif-item__read-btn"
+                              (click)="$event.stopPropagation(); markRead(n.notification_id)"
+                              title="Mark as read">
+                        <img src="icons/check.svg" class="icon icon--xs" alt="mark read">
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
         <div class="topbar__avatar"><span>{{ student.initials }}</span></div>
         <div class="topbar__user">
           <span class="topbar__user-name">{{ student.name }}</span>
@@ -113,18 +162,20 @@
         }
 
         <!-- Payment due banner -->
-        <div class="due-banner">
-          <div class="due-banner__left">
-            <span class="due-banner__icon">
-              <img src="icons/clock.svg" class="icon icon--banner" alt="due date">
-            </span>
-            <div>
-              <strong>Rent due in {{ nextPayment.daysLeft }} days</strong>
-              <p>€{{ nextPayment.amount | number }} for {{ nextPayment.month }} — due {{ nextPayment.dueDate }}</p>
+        @if (hasActiveContract && showRentBanner) {
+          <div class="due-banner">
+            <div class="due-banner__left">
+              <span class="due-banner__icon">
+                <img src="icons/clock.svg" class="icon icon--banner" alt="due date">
+              </span>
+              <div>
+                <strong>Rent due in {{ nextPayment.daysLeft }} days</strong>
+                <p>€{{ nextPayment.amount | number }} for {{ nextPayment.month }} — due {{ nextPayment.dueDate }}</p>
+              </div>
             </div>
+            <button class="btn-primary" (click)="navigateTo('payments')">Pay Now</button>
           </div>
-          <button class="btn-primary" (click)="navigateTo('payments')">Pay Now</button>
-        </div>
+        }
 
         <div class="bottom-row">
           <!-- Recent activity -->
@@ -220,7 +271,11 @@
                 <div class="avatar-info">
                   <h3 class="avatar-name">{{ student.name }}</h3>
                   <p class="avatar-id">ID: {{ student.studentId }}</p>
-                  <span class="badge badge--success" style="margin-top:0.4rem">Active Resident</span>
+                  @if (hasActiveContract) {
+                    <span class="badge badge--success" style="margin-top:0.4rem">Active Resident</span>
+                  } @else {
+                    <span class="badge badge--danger" style="margin-top:0.4rem">Applicant</span>
+                  }
                 </div>
               </div>
 
@@ -549,35 +604,35 @@
                 <span class="timeline-dot"></span>
                 <div>
                   <strong>Application Submitted</strong>
-                  <p>Dec 20, 2025</p>
+                  <p>{{ contractInfo.submissionDate }}</p>
                 </div>
               </div>
               <div class="timeline-item timeline-item--done">
                 <span class="timeline-dot"></span>
                 <div>
                   <strong>Application Accepted</strong>
-                  <p>Jan 5, 2026</p>
+                  <p>{{ contractInfo.contractCreatedAt }}</p>
                 </div>
               </div>
               <div class="timeline-item timeline-item--done">
                 <span class="timeline-dot"></span>
                 <div>
                   <strong>Contract Signed & Activated</strong>
-                  <p>Jan 15, 2026</p>
+                  <p>{{ contractInfo.startDate }}</p>
                 </div>
               </div>
               <div class="timeline-item timeline-item--active">
                 <span class="timeline-dot"></span>
                 <div>
                   <strong>Active Contract Period</strong>
-                  <p>Jan 15, 2026 – Dec 15, 2026</p>
+                  <p>{{ contractInfo.startDate }} – {{ contractInfo.endDate }}</p>
                 </div>
               </div>
               <div class="timeline-item timeline-item--pending">
                 <span class="timeline-dot"></span>
                 <div>
                   <strong>Contract Expiry / Renewal</strong>
-                  <p>Dec 15, 2026</p>
+                  <p>{{ contractInfo.endDate }}</p>
                 </div>
               </div>
             </div>
@@ -842,7 +897,7 @@
                 </div>
               </div>
               <div class="conf-modal__actions">
-                <button class="action-btn action-btn--reject" (click)="closeComplaintDialog()">Cancel</button>
+                <button class="btn-secondary" (click)="closeComplaintDialog()">Cancel</button>
                 <button class="btn-primary" (click)="confirmSubmitComplaint()">
                   <img src="icons/check.svg" class="icon icon--btn" alt="submit"> Submit Complaint
                 </button>
@@ -1117,6 +1172,25 @@
 
     </div><!-- /content -->
 
+    <!-- ─── TOAST NOTIFICATIONS ───────────────────────────────────── -->
+    <div class="toast-container">
+      @for (toast of toasts; track toast.notification_id) {
+        <div class="toast toast--{{ toast.type }}" (click)="onToastClick(toast)">
+          <span class="toast__icon">
+            <img [src]="'icons/' + notifIcon(toast.type)" class="icon" [alt]="toast.type">
+          </span>
+          <div class="toast__body">
+            <p class="toast__type">{{ toast.type | titlecase }}</p>
+            <p class="toast__msg">{{ toast.message }}</p>
+          </div>
+          <button class="toast__close" (click)="$event.stopPropagation(); dismissToast(toast)"
+                  title="Dismiss">
+            <img src="icons/x-mark.svg" class="icon icon--xs" alt="close">
+          </button>
+        </div>
+      }
+    </div>
+
     <!-- ─── TERMINATION REQUEST DIALOG ────────────────────────────── -->
     @if (terminationDialog.open) {
       <div class="conf-backdrop" (click)="closeTerminationDialog()">
@@ -1187,6 +1261,9 @@
         </div>
       </div>
     }
+
+    <!-- Child route outlet (hidden — parent shell owns all rendering) -->
+    <router-outlet style="display:none" />
 
   </div><!-- /main -->
 </div><!-- /layout -->

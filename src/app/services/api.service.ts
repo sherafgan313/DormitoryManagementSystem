@@ -225,6 +225,34 @@ export class ApiService {
     return this.http.post(`${this.BASE}/contracts/admin-terminate`, { contract_id, reason, requested_end_date }, { headers: this.headers });
   }
 
+  // ── Admin reports ─────────────────────────────────────────────────
+  generateAdminReport(payload: { stats: any; chartImages: { occupancy: string; finances: string; maintenance: string } }): Observable<any> {
+    return this.http.post(`${this.BASE}/admin/reports`, payload, { headers: this.headers });
+  }
+
+  downloadAdminReport(fileName: string): string {
+    return `http://localhost:3000/uploads/reports/${fileName}`;
+  }
+
+  // ── Payment summary ───────────────────────────────────────────────
+  getPaymentSummary(month: string, year: number): Observable<any> {
+    return this.http.get<any>(`${this.BASE}/payments/summary?month=${month}&year=${year}`, { headers: this.headers });
+  }
+
+  // ── Room management ───────────────────────────────────────────────
+  clearRoomMaintenance(roomId: number): Observable<any> {
+    return this.http.patch(`${this.BASE}/rooms/${roomId}/status`, { status: 'vacant' }, { headers: this.headers });
+  }
+
+  // ── Dormitory settings ────────────────────────────────────────────
+  getDormitorySettings(): Observable<{ notifications_enabled: number; payment_reminders_enabled: number; maintenance_alerts_enabled: number }> {
+    return this.http.get<any>(`${this.BASE}/dormitory-settings`, { headers: this.headers });
+  }
+
+  updateDormitorySettings(settings: { notifications_enabled: boolean; payment_reminders_enabled: boolean; maintenance_alerts_enabled: boolean }): Observable<any> {
+    return this.http.put(`${this.BASE}/dormitory-settings`, settings, { headers: this.headers });
+  }
+
   // ── Student profile ───────────────────────────────────────────────
   getProfile(): Observable<any> {
     return this.http.get<any>(`${this.BASE}/profile`, { headers: this.headers });

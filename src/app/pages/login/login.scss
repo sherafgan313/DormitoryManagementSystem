@@ -101,6 +101,21 @@
       color: var(--primary-light);
     }
   }
+
+  &__register {
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    text-align: center;
+  }
+
+  &__register-link {
+    color: var(--accent);
+    font-weight: 500;
+    cursor: pointer;
+    margin-left: 0.25rem;
+    &:hover { text-decoration: underline; }
+  }
 }
 
 /* ---- Login form ---- */
