@@ -1,0 +1,18 @@
+FROM node:20
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install only production dependencies if you want, but for simplicity install all
+RUN npm install
+
+# Copy all the files
+COPY . .
+
+# Expose the API port
+EXPOSE 3000
+
+# Run the Express server
+CMD ["node", "server.js"]

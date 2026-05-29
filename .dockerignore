@@ -1,0 +1,9 @@
+node_modules
+dist
+.git
+.vscode
+.angular
+.env
+coverage
+*.log
+uploads

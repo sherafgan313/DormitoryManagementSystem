@@ -1,0 +1,47 @@
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: dms_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: dorm_management
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./Documentation/dorm_management_all.sql:/docker-entrypoint-initdb.d/init.sql
+
+  api:
+    build: 
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: dms_api
+    restart: always
+    environment:
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: dorm_management
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    volumes:
+      - ./uploads:/app/uploads
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dms_web
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+
+volumes:
+  db_data:

@@ -16,17 +16,24 @@ app.use(bodyParser.json());
 const SECRET = "SUPER_SECRET_KEY";
 
 const db = mysql.createConnection({
-  host:     "localhost",
-  user:     "root",
-  password: "",
-  database: "dorm_management",
+  host:     process.env.DB_HOST || "localhost",
+  user:     process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "",
+  database: process.env.DB_NAME || "dorm_management",
 });
 
-db.connect((err) => {
-  if (err) { console.error("DB connection failed:", err); return; }
-  console.log("MySQL Connected");
-  runMigrations().then(() => seedDemoData());
-});
+function handleDisconnect() {
+  db.connect((err) => {
+    if (err) {
+      console.error("DB connection failed, retrying in 2 seconds...", err.message);
+      setTimeout(handleDisconnect, 2000);
+      return;
+    }
+    console.log("MySQL Connected");
+    runMigrations().then(() => seedDemoData());
+  });
+}
+handleDisconnect();
 
 
 // ─── FILE UPLOAD SETUP ────────────────────────────────────────────────────────
@@ -426,6 +433,7 @@ app.post("/api/register", async (req, res) => {
     res.json({ message: "Student account created" });
   } catch (err) {
     await dbp.query("ROLLBACK").catch(() => {});
+    console.error("Registration Error:", err);
     if (err?.code === "ER_DUP_ENTRY") return res.status(409).json({ message: "Email already registered" });
     res.status(500).json({ message: "Registration failed" });
   }
